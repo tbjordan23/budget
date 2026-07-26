@@ -189,6 +189,9 @@
   .add-sheet-panel select{
     font-family:'Inter',sans-serif;font-size:13.5px;font-weight:500;color:var(--ink);
     border:1.5px solid var(--field-border);background:var(--field-bg);border-radius:9px;padding:.4rem 1.8rem .4rem .6rem;
+    appearance:none;-webkit-appearance:none;-moz-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236D7086' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;background-size:10px 6px;
   }
 
   body.readonly-view .row-remove,body.readonly-view .add-btn{display:none;}
@@ -268,7 +271,7 @@
     </div>
   </div>
 
-  <details style="margin-bottom:16px;">
+  <details style="margin-bottom:16px;" open>
     <summary><h2>Subscriptions detail</h2><i class="chev" aria-hidden="true"></i></summary>
     <div class="sub-body" id="subsRows"></div>
   </details>
@@ -759,7 +762,7 @@ function renderPills(){
     const label = document.createElement('span');
     label.textContent = sheet.name;
     pill.appendChild(label);
-    if(sheetsIndex.length > 1){
+    if(sheet.editable && sheetsIndex.length > 1){
       const x = document.createElement('span');
       x.className = 'pill-x';
       x.textContent = '×';
@@ -781,7 +784,7 @@ function renderPills(){
 async function deleteSheet(id){
   if(sheetsIndex.length <= 1) return;
   const sheet = sheetsIndex.find(s=>s.id===id);
-  if(!sheet) return;
+  if(!sheet || !sheet.editable) return;
   if(!confirm(`Delete "${sheet.name}"? This can't be undone.`)) return;
   sheetsIndex = sheetsIndex.filter(s=>s.id!==id);
   if(id !== '2026'){
