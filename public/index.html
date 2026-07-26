@@ -107,7 +107,7 @@
   #payPeriods{text-align:center;width:64px;-moz-appearance:textfield;appearance:textfield;}
   #payPeriods::-webkit-inner-spin-button,#payPeriods::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;width:0;}
 
-  .row.total{font-weight:600;padding-top:.65rem;margin-top:.25rem;border-top:2px solid var(--ink);border-bottom:none;}
+  .row.total{font-weight:600;padding-top:.65rem;margin-top:.25rem;border-top:none;border-bottom:none;}
   .row.total .name{color:var(--ink);font-weight:600;}
   .row.total .amt-wrap{font-weight:600;color:var(--primary);}
 
@@ -204,7 +204,7 @@
   }
   body.readonly-view #payPeriods:disabled{
     color:#fff;opacity:1;-webkit-text-fill-color:#fff;cursor:default;
-    background:transparent;border-color:transparent;
+    background:transparent;border-color:transparent;padding:0;
   }
 
   @media print{
