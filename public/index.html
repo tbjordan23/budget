@@ -276,7 +276,7 @@
     </div>
   </div>
 
-  <details style="margin-bottom:16px;" open>
+  <details id="subsDetails" style="margin-bottom:16px;" open>
     <summary><h2>Subscriptions detail</h2><i class="chev" aria-hidden="true"></i></summary>
     <div class="sub-body" id="subsRows"></div>
   </details>
@@ -403,26 +403,38 @@ function p2Total(){ return state.p2.reduce((s,i)=>s+i.val,0); }
 
 function renderRows(container, items, group, withCat){
   container.innerHTML = '';
-  items.forEach((item, idx)=>{
+  const order = items.map((item, idx)=>idx);
+  if(withCat && !EDITABLE){
+    order.sort((a,b)=> CAT_ORDER.indexOf(items[a].cat) - CAT_ORDER.indexOf(items[b].cat));
+  }
+  order.forEach(idx=>{
+    const item = items[idx];
     const row = document.createElement('div');
     row.className = 'row';
     if(item.locked){
+      const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
       row.innerHTML = `
         <span class="name">${item.label} <span class="locked-tag">auto</span></span>
         <span class="amt-wrap"><span class="cur">$</span>
           <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(item.val)}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
-        <span style="width:22px;"></span>`;
+        ${endSpacer}`;
+      container.appendChild(row);
+      return;
+    }
+    const catDot = withCat ? `<i class="catdot" data-action="cycle-cat" data-group="${group}" data-idx="${idx}" style="background:${CAT[item.cat].color}" title="Click to change category"></i>` : '';
+    if(!EDITABLE){
+      row.innerHTML = `
+        <span class="name">${catDot}${item.label}</span>
+        <span class="amt-wrap"><span class="cur">$</span><span class="amt-text">${commas(item.val)}</span></span>`;
       container.appendChild(row);
       return;
     }
     row.dataset.dragGroup = group;
     row.dataset.dragIdx = idx;
-    const catDot = withCat ? `<i class="catdot" data-action="cycle-cat" data-group="${group}" data-idx="${idx}" style="background:${CAT[item.cat].color}" title="Click to change category"></i>` : '';
-    const dis = EDITABLE ? '' : 'disabled';
     row.innerHTML = `
-      <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label" ${dis}></span>
+      <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label"></span>
       <span class="amt-wrap"><span class="cur">$</span>
-        <input type="text" inputmode="decimal" class="amt-input" value="${commas(item.val)}" data-group="${group}" data-idx="${idx}" data-field="val" ${dis}></span>
+        <input type="text" inputmode="decimal" class="amt-input" value="${commas(item.val)}" data-group="${group}" data-idx="${idx}" data-field="val"></span>
       <button class="row-remove" data-action="remove" data-group="${group}" data-idx="${idx}" aria-label="Remove ${item.label}"></button>`;
     container.appendChild(row);
   });
@@ -431,6 +443,12 @@ function renderRows(container, items, group, withCat){
 function renderSubsLinkRow(){
   const row = document.createElement('div');
   row.className = 'row';
+  if(!EDITABLE){
+    row.innerHTML = `
+      <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
+      <span class="amt-wrap"><span class="cur">$</span><span class="amt-text">${commas(subsTotal())}</span></span>`;
+    return row;
+  }
   row.innerHTML = `
     <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
     <span class="amt-wrap"><span class="cur">$</span>
@@ -463,6 +481,8 @@ function addBtn(group, label){
 }
 
 function render(){
+  const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
+
   const incomeContainer = document.getElementById('incomeRows');
   renderRows(incomeContainer, state.income, 'income', false);
   incomeContainer.appendChild(addBtn('income', 'Add income line'));
@@ -472,7 +492,7 @@ function render(){
   if(state.subs.length > 0) p1c.appendChild(renderSubsLinkRow());
   const p1TotalRow = document.createElement('div');
   p1TotalRow.className = 'row total';
-  p1TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  p1TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span>${endSpacer}`;
   p1c.appendChild(p1TotalRow);
   p1c.appendChild(addBtn('p1', 'Add item'));
 
@@ -480,15 +500,18 @@ function render(){
   renderRows(p2c, state.p2, 'p2', true);
   const p2TotalRow = document.createElement('div');
   p2TotalRow.className = 'row total';
-  p2TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  p2TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span>${endSpacer}`;
   p2c.appendChild(p2TotalRow);
   p2c.appendChild(addBtn('p2', 'Add item'));
+
+  const subsDetails = document.getElementById('subsDetails');
+  if(subsDetails) subsDetails.style.display = (!EDITABLE && state.subs.length === 0) ? 'none' : '';
 
   const subsc = document.getElementById('subsRows');
   renderRows(subsc, state.subs, 'subs', false);
   const subsTotalRow = document.createElement('div');
   subsTotalRow.className = 'row total';
-  subsTotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  subsTotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span>${endSpacer}`;
   subsc.appendChild(subsTotalRow);
   subsc.appendChild(addBtn('subs', 'Add subscription'));
 
