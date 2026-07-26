@@ -52,6 +52,7 @@
 
   .ret-year{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--ink-soft);}
   .ret-note{font-size:11.5px;color:var(--ink-soft);}
+  .ret-subhead{font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;color:var(--ink);margin:1.1rem 0 .3rem;display:flex;align-items:baseline;gap:.5rem;}
   .amt-wrap .cur.pct{margin-left:4px;margin-right:0;}
   .amt-wrap .cur.ret-ghost{visibility:hidden;}
   .ret-deficit .name,.ret-deficit .amt-wrap{color:var(--warn);}
@@ -360,6 +361,8 @@
 
     <div class="pills-bar" id="retAgePills" style="margin-bottom:1.25rem;">
       <button type="button" class="pill" data-age="59">Age 59</button>
+      <button type="button" class="pill" data-age="60">Age 60</button>
+      <button type="button" class="pill" data-age="61">Age 61</button>
       <button type="button" class="pill" data-age="62">Age 62</button>
       <button type="button" class="pill" data-age="combined">Combined</button>
     </div>
@@ -377,15 +380,18 @@
         <div class="card-head"><h2>At age 59 <span class="ret-year" id="retAge59YearLabel"></span></h2></div>
         <div id="retAge59Rows"></div>
       </div>
+      <div class="card" id="retAge60Card">
+        <div class="card-head"><h2>At age 60 <span class="ret-year" id="retAge60YearLabel"></span></h2></div>
+        <div id="retAge60Rows"></div>
+      </div>
+      <div class="card" id="retAge61Card">
+        <div class="card-head"><h2>At age 61 <span class="ret-year" id="retAge61YearLabel"></span></h2></div>
+        <div id="retAge61Rows"></div>
+      </div>
       <div class="card" id="retAge62Card">
         <div class="card-head"><h2>At age 62 <span class="ret-year" id="retAge62YearLabel"></span></h2></div>
         <div id="retAge62Rows"></div>
       </div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-head"><h2>Extra cash</h2><span class="ret-note">Not counted toward monthly income</span></div>
-      <div id="retExtraRows"></div>
     </div>
 
     <div class="grid">
@@ -1030,7 +1036,7 @@ const defaultRetState = {
   raisePct: 4,
   adobe401k: { balance: 47000, growthPct: 8, employeePct: 6, matchPct: 3 },
   church401k: { balance: 288000, growthPct: 8 },
-  pension: { age59Monthly: 2300, age62Monthly: 2800, age59Year: 2036, age62Year: 2039 },
+  pension: { age59Monthly: 2300, age60Monthly: 2500, age61Monthly: 2650, age62Monthly: 2800, age59Year: 2036, age62Year: 2039 },
   socialSecurityAge62Monthly: 2800,
   withdrawalRatePct: 4,
   extraCash: { idcMonthly: 3000, adobeStock: 250000 },
@@ -1079,43 +1085,49 @@ function buildRetSeries(rs, maxYears){
   return series;
 }
 
+const RET_AGES = [59, 60, 61, 62];
+function retYearForAge(age){
+  const rs = retState;
+  const span = rs.pension.age62Year - rs.pension.age59Year;
+  return Math.round(rs.pension.age59Year + (age - 59) / (62 - 59) * span);
+}
+
 function computeRetProjection(){
   const rs = retState;
   const nowYear = new Date().getFullYear();
-  const maxYears = Math.max(rs.pension.age59Year - nowYear, rs.pension.age62Year - nowYear, 0);
+  const maxYears = Math.max(retYearForAge(62) - nowYear, 0);
   const series = buildRetSeries(rs, maxYears);
   const atYear = targetYear => series.find(s => s.year === targetYear) || series[series.length-1];
-  function scenario(ageKey){
-    const isAge59 = ageKey === 59;
-    const targetYear = isAge59 ? rs.pension.age59Year : rs.pension.age62Year;
+  function scenario(age){
+    const targetYear = retYearForAge(age);
     const point = atYear(targetYear);
     const investmentMonthly = point.total * (rs.withdrawalRatePct/100) / 12;
-    const pensionMonthly = isAge59 ? rs.pension.age59Monthly : rs.pension.age62Monthly;
-    const ssMonthly = isAge59 ? 0 : rs.socialSecurityAge62Monthly;
+    const pensionMonthly = rs.pension['age' + age + 'Monthly'];
+    const ssMonthly = age === 62 ? rs.socialSecurityAge62Monthly : 0;
     const totalMonthly = investmentMonthly + pensionMonthly + ssMonthly;
     const deficit = totalMonthly - rs.retirementExpensesMonthly;
-    return {year: targetYear, adobeBal: point.adobe, churchBal: point.church, totalBal: point.total, investmentMonthly, pensionMonthly, ssMonthly, totalMonthly, deficit};
+    return {age, year: targetYear, adobeBal: point.adobe, churchBal: point.church, totalBal: point.total, investmentMonthly, pensionMonthly, ssMonthly, totalMonthly, deficit};
   }
-  return {series, age59: scenario(59), age62: scenario(62)};
+  const scenarios = {};
+  RET_AGES.forEach(age => { scenarios[age] = scenario(age); });
+  return {series, scenarios};
 }
 
 function renderRetStats(proj){
   const el = document.getElementById('retStats');
   const sel = retState.selectedAge;
-  const tile59 = `
-    <div class="stat"><p class="label">Total invested · age 59</p><p class="value">${fmt(proj.age59.totalBal)}</p></div>
-    <div class="stat ${proj.age59.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Monthly surplus / (deficit) · age 59</p><p class="value">${fmt(proj.age59.deficit)}</p></div>`;
-  const tile62 = `
-    <div class="stat"><p class="label">Total invested · age 62</p><p class="value">${fmt(proj.age62.totalBal)}</p></div>
-    <div class="stat ${proj.age62.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Monthly surplus / (deficit) · age 62</p><p class="value">${fmt(proj.age62.deficit)}</p></div>`;
-  if(sel === 59) el.innerHTML = tile59;
-  else if(sel === 62) el.innerHTML = tile62;
-  else el.innerHTML = tile59 + tile62;
+  const ages = sel === 'combined' ? RET_AGES : [sel];
+  el.innerHTML = ages.map(age=>{
+    const s = proj.scenarios[age];
+    return `
+    <div class="stat"><p class="label">Total invested · age ${age}</p><p class="value">${fmt(s.totalBal)}</p></div>
+    <div class="stat ${s.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Monthly surplus / (deficit) · age ${age}</p><p class="value">${fmt(s.deficit)}</p></div>`;
+  }).join('');
 }
 
-function renderRetBreakdown(containerId, yearLabelId, scenario){
-  document.getElementById(yearLabelId).textContent = '(' + scenario.year + ')';
-  const el = document.getElementById(containerId);
+function renderRetBreakdown(age, scenario){
+  document.getElementById('retAge' + age + 'YearLabel').textContent = '(' + scenario.year + ')';
+  const el = document.getElementById('retAge' + age + 'Rows');
   el.innerHTML = '';
   const rows = [
     ['Church pension', scenario.pensionMonthly],
@@ -1165,14 +1177,15 @@ function renderRetChart(proj){
   const linePath = key => series.map((s,i) => (i===0?'M':'L') + xPos(s.year).toFixed(1) + ',' + yPos(s[key]).toFixed(1)).join(' ');
 
   const milestones = [];
-  if(retState.selectedAge === 59 || retState.selectedAge === 'combined') milestones.push({year: retState.pension.age59Year, label: '59'});
-  if(retState.selectedAge === 62 || retState.selectedAge === 'combined') milestones.push({year: retState.pension.age62Year, label: '62'});
+  RET_AGES.forEach(age=>{
+    if(retState.selectedAge === age || retState.selectedAge === 'combined') milestones.push({year: retYearForAge(age), label: String(age)});
+  });
   let milestoneSvg = '';
   milestones.forEach(m=>{
     if(m.year < minYear || m.year > maxYear) return;
     const mx = xPos(m.year).toFixed(1);
     milestoneSvg += `<line class="ret-milestone-line" x1="${mx}" x2="${mx}" y1="${MT}" y2="${MT+plotH}"/>`;
-    milestoneSvg += `<text class="ret-milestone-label" x="${mx}" y="${MT-4}" text-anchor="middle">Age ${m.label}</text>`;
+    milestoneSvg += `<text class="ret-milestone-label" x="${mx}" y="${MT-4}" text-anchor="middle">${m.label}</text>`;
   });
 
   const labelYears = [minYear, ...milestones.map(m=>m.year), maxYear].filter((v,i,a)=>a.indexOf(v)===i);
@@ -1247,13 +1260,6 @@ function retInputRow(container, label, path, kind){
   container.appendChild(row);
 }
 
-function renderRetExtra(){
-  const el = document.getElementById('retExtraRows');
-  el.innerHTML = '';
-  retInputRow(el, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
-  retInputRow(el, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
-}
-
 function retStaticRow(container, label, value, kind){
   const row = document.createElement('div');
   row.className = 'row';
@@ -1281,21 +1287,25 @@ function renderRetAssumpB(){
   const b = document.getElementById('retAssumpB');
   b.innerHTML = '';
   const sel = retState.selectedAge;
-  const tag59 = sel === 'combined' ? ' (59)' : '';
-  const tag62 = sel === 'combined' ? ' (62)' : '';
-  if(sel === 59 || sel === 'combined'){
-    retStaticRow(b, 'Church Pension' + tag59, retState.pension.age59Monthly, 'dollar');
-    retStaticRow(b, 'Retirement Year' + tag59, retState.pension.age59Year, 'year');
-  }
-  if(sel === 62 || sel === 'combined'){
-    retStaticRow(b, 'Church Pension' + tag62, retState.pension.age62Monthly, 'dollar');
-    retStaticRow(b, 'Retirement Year' + tag62, retState.pension.age62Year, 'year');
-  }
-  if(sel === 62 || sel === 'combined'){
-    retInputRow(b, 'Social Security' + tag62, 'socialSecurityAge62Monthly', 'dollar');
+  const ages = sel === 'combined' ? RET_AGES : [sel];
+  ages.forEach(age=>{
+    const tag = sel === 'combined' ? ` (${age})` : '';
+    retStaticRow(b, 'Church Pension' + tag, retState.pension['age'+age+'Monthly'], 'dollar');
+    retStaticRow(b, 'Retirement Year' + tag, retYearForAge(age), 'year');
+  });
+  if(ages.includes(62)){
+    const tag = sel === 'combined' ? ' (62)' : '';
+    retInputRow(b, 'Social Security' + tag, 'socialSecurityAge62Monthly', 'dollar');
   }
   retInputRow(b, '401(k) withdrawal rate', 'withdrawalRatePct', 'percent');
   retInputRow(b, 'Estimated retirement expenses (monthly)', 'retirementExpensesMonthly', 'dollar');
+
+  const subhead = document.createElement('div');
+  subhead.className = 'ret-subhead';
+  subhead.innerHTML = 'Extra cash <span class="ret-note">Not counted toward monthly income</span>';
+  b.appendChild(subhead);
+  retInputRow(b, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
+  retInputRow(b, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
 }
 
 function renderRetAssumptions(){
@@ -1315,19 +1325,17 @@ function recalcRetirement(){
   renderRetStats(proj);
   renderRetChart(proj);
   const sel = retState.selectedAge;
-  const show59 = sel === 59 || sel === 'combined';
-  const show62 = sel === 62 || sel === 'combined';
-  document.getElementById('retAge59Card').style.display = show59 ? '' : 'none';
-  document.getElementById('retAge62Card').style.display = show62 ? '' : 'none';
+  RET_AGES.forEach(age=>{
+    const show = sel === age || sel === 'combined';
+    document.getElementById('retAge' + age + 'Card').style.display = show ? '' : 'none';
+    if(show) renderRetBreakdown(age, proj.scenarios[age]);
+  });
   document.getElementById('retBreakdownGrid').classList.toggle('ret-single-card', sel !== 'combined');
-  if(show59) renderRetBreakdown('retAge59Rows', 'retAge59YearLabel', proj.age59);
-  if(show62) renderRetBreakdown('retAge62Rows', 'retAge62YearLabel', proj.age62);
   renderRetAgePills();
 }
 
 function renderRetirement(){
   recalcRetirement();
-  renderRetExtra();
   renderRetAssumptions();
 }
 
