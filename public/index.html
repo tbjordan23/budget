@@ -179,6 +179,7 @@
   }
   .pill-x:hover{opacity:1;background:rgba(0,0,0,.15);}
   .pill.pill-add{padding:.45rem .7rem;color:var(--primary);border-style:dashed;font-size:16px;line-height:1;}
+  .pill.pill-solo{padding:.45rem .9rem;}
 
   .add-sheet-panel{
     display:none;align-items:flex-end;gap:.6rem;flex-wrap:wrap;
@@ -757,12 +758,13 @@ function renderPills(){
   sheetsIndex.forEach(sheet=>{
     const pill = document.createElement('button');
     pill.type = 'button';
-    pill.className = 'pill' + (sheet.id === currentSheetId ? ' active' : '');
+    const hasX = sheet.editable && sheetsIndex.length > 1;
+    pill.className = 'pill' + (sheet.id === currentSheetId ? ' active' : '') + (hasX ? '' : ' pill-solo');
     pill.addEventListener('click', ()=> loadSheet(sheet.id));
     const label = document.createElement('span');
     label.textContent = sheet.name;
     pill.appendChild(label);
-    if(sheet.editable && sheetsIndex.length > 1){
+    if(hasX){
       const x = document.createElement('span');
       x.className = 'pill-x';
       x.textContent = '×';
