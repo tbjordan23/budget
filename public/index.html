@@ -230,7 +230,7 @@
     <h2>Annual summary</h2>
     <div class="arow"><span>Pay periods per year (biweekly)</span><span class="amt-wrap"><input type="number" id="payPeriods" step="1"></span></div>
     <div class="arow"><span>Annual net income (paychecks)</span><span class="amt-wrap" id="annualNet"></span></div>
-    <div class="arow"><span>60% of Adobe Bonus + IDC income</span><span class="amt-wrap" id="annualOther"></span></div>
+    <div class="arow"><span>65% of Adobe Bonus + IDC income</span><span class="amt-wrap" id="annualOther"></span></div>
     <div class="arow"><span>Total annual net income</span><span class="amt-wrap" id="annualNetTotal"></span></div>
     <div class="arow"><span>Total annual budgeted expenses</span><span class="amt-wrap" id="annualExpense"></span></div>
     <div class="arow"><span>Annual surplus / (shortfall)</span><span class="amt-wrap" id="annualSurplus"></span></div>
@@ -470,7 +470,7 @@ function recalcTotals(){
   const idc = idcItem ? idcItem.val : 0;
   const annualNet = netPaycheck * state.payPeriods;
   const grossTotal = salary + bonus + idc;
-  const netOther = 0.6*bonus + 0.6*idc;
+  const netOther = 0.65*bonus + 0.65*idc;
   const netTotal = annualNet + netOther;
   const totalExpense = (p1t + p2t) * (state.payPeriods/2);
   const surplus = netTotal - totalExpense;
