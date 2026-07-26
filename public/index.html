@@ -1254,7 +1254,17 @@ function renderRetExtra(){
   retInputRow(el, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
 }
 
-function renderRetAssumptions(){
+function retStaticRow(container, label, value, kind){
+  const row = document.createElement('div');
+  row.className = 'row';
+  const display = kind === 'dollar'
+    ? `<span class="cur">$</span><span class="amt-text">${commas(value)}</span>`
+    : `<span class="amt-text">${value}</span>`;
+  row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${display}</span>`;
+  container.appendChild(row);
+}
+
+function renderRetAssumpA(){
   const a = document.getElementById('retAssumpA');
   a.innerHTML = '';
   retInputRow(a, 'Current salary', 'salary', 'dollar');
@@ -1265,16 +1275,32 @@ function renderRetAssumptions(){
   retInputRow(a, 'Adobe 401(k) match (Adobe)', 'adobe401k.matchPct', 'percent');
   retInputRow(a, 'Church Roth 401(k) balance', 'church401k.balance', 'dollar');
   retInputRow(a, 'Church 401(k) growth rate', 'church401k.growthPct', 'percent');
+}
 
+function renderRetAssumpB(){
   const b = document.getElementById('retAssumpB');
   b.innerHTML = '';
-  retInputRow(b, 'Church pension at 59', 'pension.age59Monthly', 'dollar');
-  retInputRow(b, 'Church pension at 62', 'pension.age62Monthly', 'dollar');
-  retInputRow(b, 'Age 59 year', 'pension.age59Year', 'year');
-  retInputRow(b, 'Age 62 year', 'pension.age62Year', 'year');
-  retInputRow(b, 'Social Security at 62', 'socialSecurityAge62Monthly', 'dollar');
+  const sel = retState.selectedAge;
+  const tag59 = sel === 'combined' ? ' (59)' : '';
+  const tag62 = sel === 'combined' ? ' (62)' : '';
+  if(sel === 59 || sel === 'combined'){
+    retStaticRow(b, 'Church Pension' + tag59, retState.pension.age59Monthly, 'dollar');
+    retStaticRow(b, 'Retirement Year' + tag59, retState.pension.age59Year, 'year');
+  }
+  if(sel === 62 || sel === 'combined'){
+    retStaticRow(b, 'Church Pension' + tag62, retState.pension.age62Monthly, 'dollar');
+    retStaticRow(b, 'Retirement Year' + tag62, retState.pension.age62Year, 'year');
+  }
+  if(sel === 62 || sel === 'combined'){
+    retInputRow(b, 'Social Security' + tag62, 'socialSecurityAge62Monthly', 'dollar');
+  }
   retInputRow(b, '401(k) withdrawal rate', 'withdrawalRatePct', 'percent');
   retInputRow(b, 'Estimated retirement expenses (monthly)', 'retirementExpensesMonthly', 'dollar');
+}
+
+function renderRetAssumptions(){
+  renderRetAssumpA();
+  renderRetAssumpB();
 }
 
 function renderRetAgePills(){
@@ -1370,6 +1396,7 @@ function attachRetirementHandlers(){
     if(!btn) return;
     retState.selectedAge = btn.dataset.age === 'combined' ? 'combined' : parseInt(btn.dataset.age, 10);
     recalcRetirement();
+    renderRetAssumpB();
     queueRetSave();
   });
 }
