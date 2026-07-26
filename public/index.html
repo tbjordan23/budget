@@ -1129,13 +1129,16 @@ function computeRetProjection(){
 function renderRetStats(proj){
   const el = document.getElementById('retStats');
   const sel = retState.selectedAge;
-  const ages = sel === 'combined' ? RET_AGES : [sel];
-  el.innerHTML = ages.map(age=>{
-    const s = proj.scenarios[age];
-    return `
-    <div class="stat"><p class="label">Total invested · age ${age}</p><p class="value">${fmt(s.totalBal)}</p></div>
-    <div class="stat ${s.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Monthly surplus / (deficit) · age ${age}</p><p class="value">${fmt(s.deficit)}</p></div>`;
-  }).join('');
+  if(sel === 'combined'){
+    el.innerHTML = '';
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+  const s = proj.scenarios[sel];
+  el.innerHTML = `
+    <div class="stat"><p class="label">Total invested · age ${sel}</p><p class="value">${fmt(s.totalBal)}</p></div>
+    <div class="stat ${s.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Monthly surplus / (deficit) · age ${sel}</p><p class="value">${fmt(s.deficit)}</p></div>`;
 }
 
 function renderRetBreakdown(age, scenario){
