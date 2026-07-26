@@ -50,6 +50,32 @@
 
   .placeholder-card{color:var(--ink-soft);font-size:14.5px;padding:2.4rem 1.5rem;text-align:center;}
 
+  .ret-year{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--ink-soft);}
+  .ret-note{font-size:11.5px;color:var(--ink-soft);}
+  .amt-wrap .cur.pct{margin-left:4px;margin-right:0;}
+  .ret-deficit .name,.ret-deficit .amt-wrap{color:var(--warn);}
+  .ret-surplus .amt-wrap{color:var(--good);}
+
+  .ret-chart-legend{display:flex;gap:1.1rem;margin-bottom:.7rem;font-size:12.5px;color:var(--ink-soft);font-weight:500;}
+  .ret-chart-legend span{display:inline-flex;align-items:center;gap:.4rem;}
+  .ret-chart-legend i{width:14px;height:2px;border-radius:2px;display:inline-block;}
+  .ret-chart-wrap{position:relative;width:100%;}
+  .ret-chart-wrap svg{display:block;width:100%;height:auto;overflow:visible;}
+  .ret-chart-wrap .ret-gridline{stroke:var(--line);stroke-width:1;}
+  .ret-chart-wrap .ret-axis-label{font-family:'Inter',sans-serif;font-size:10.5px;fill:var(--ink-soft);}
+  .ret-chart-wrap .ret-milestone-line{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:3,3;}
+  .ret-chart-wrap .ret-milestone-label{font-family:'Inter',sans-serif;font-size:10px;font-weight:600;fill:var(--ink-soft);}
+  .ret-crosshair{position:absolute;top:0;bottom:26px;width:1px;background:var(--ink-soft);opacity:0;pointer-events:none;}
+  .ret-tooltip{
+    position:absolute;top:6px;background:var(--ink);color:#fff;border-radius:8px;padding:.55rem .7rem;
+    font-size:12px;line-height:1.5;pointer-events:none;opacity:0;transform:translateX(-50%);white-space:nowrap;
+    box-shadow:0 8px 20px rgba(0,0,0,.18);z-index:5;
+  }
+  .ret-tooltip .tt-title{font-weight:600;margin-bottom:.15rem;color:#fff;}
+  .ret-tooltip .tt-row{display:flex;align-items:center;gap:.4rem;}
+  .ret-tooltip .tt-row i{width:9px;height:2px;border-radius:2px;display:inline-block;flex-shrink:0;}
+  .ret-tooltip .tt-val{margin-left:auto;font-weight:600;padding-left:.6rem;}
+
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;gap:1rem;flex-wrap:wrap;}
   .eyebrow{font-family:'Sora',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 .4rem;}
   h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(28px,4vw,38px);margin:0;color:var(--ink);letter-spacing:-.02em;}
@@ -321,15 +347,47 @@
       <div>
         <p class="eyebrow">Jordan Finance</p>
         <h1>Retirement Planning</h1>
-        <p class="sub">This section is coming soon.</p>
+        <p class="sub">Projected income at age 59 and 62, based on your accounts, growth, and contribution assumptions.</p>
       </div>
       <div class="actions">
-        <span class="save-flag"><span class="dot" style="background:var(--good);"></span><span>synced</span></span>
+        <span class="save-flag" id="retSaveFlag"><span class="dot" id="retSaveDot"></span><span id="retSaveText">synced</span></span>
         <button class="primary" onclick="window.print()">Print</button>
       </div>
     </div>
-    <div class="card placeholder-card">
-      <p>Retirement account balances, contributions, and projections will live here.</p>
+
+    <div class="stats" id="retStats"></div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h2>Projected account growth</h2></div>
+      <div class="ret-chart-legend" id="retChartLegend"></div>
+      <div class="ret-chart-wrap" id="retChartWrap"></div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-head"><h2>At age 59 <span class="ret-year" id="retAge59YearLabel"></span></h2></div>
+        <div id="retAge59Rows"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>At age 62 <span class="ret-year" id="retAge62YearLabel"></span></h2></div>
+        <div id="retAge62Rows"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-head"><h2>Extra cash</h2><span class="ret-note">Not counted toward monthly income</span></div>
+      <div id="retExtraRows"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><h2>Salary &amp; investment accounts</h2></div>
+        <div id="retAssumpA"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Pension, Social Security &amp; expenses</h2></div>
+        <div id="retAssumpB"></div>
+      </div>
     </div>
   </div>
 
@@ -955,6 +1013,332 @@ async function loadSheet(id){
   render();
 }
 
+const RET_STORE_KEY = 'retirement-planning-v1';
+const RET_COLOR_ADOBE = '#8B5CF6';
+const RET_COLOR_CHURCH = '#0EA5E9';
+const defaultRetState = {
+  salary: 198000,
+  raisePct: 4,
+  adobe401k: { balance: 47000, growthPct: 8, employeePct: 6, matchPct: 3 },
+  church401k: { balance: 288000, growthPct: 8 },
+  pension: { age59Monthly: 2300, age62Monthly: 2800, age59Year: 2036, age62Year: 2039 },
+  socialSecurityAge62Monthly: 2800,
+  withdrawalRatePct: 4,
+  extraCash: { idcMonthly: 3000, adobeStock: 250000 },
+  retirementExpensesMonthly: 8000,
+};
+let retState = JSON.parse(JSON.stringify(defaultRetState));
+let retSaveTimer = null;
+
+function retGet(path){ return path.split('.').reduce((o,k)=>o[k], retState); }
+function retSet(path, val){
+  const keys = path.split('.');
+  let o = retState;
+  for(let i=0;i<keys.length-1;i++) o = o[keys[i]];
+  o[keys[keys.length-1]] = val;
+}
+function fmtCompact(n){
+  const abs = Math.abs(n);
+  if(abs >= 1000000) return '$' + (n/1000000).toFixed(1).replace(/\.0$/,'') + 'M';
+  if(abs >= 1000) return '$' + Math.round(n/1000) + 'K';
+  return '$' + Math.round(n);
+}
+
+function projectAdobe401k(balance, salary, employeePct, matchPct, growthPct, raisePct, years){
+  let bal = balance, sal = salary;
+  for(let i=0;i<years;i++){
+    const contribution = sal * (employeePct + matchPct) / 100;
+    bal = bal * (1 + growthPct/100) + contribution;
+    sal = sal * (1 + raisePct/100);
+  }
+  return bal;
+}
+
+function buildRetSeries(rs, maxYears){
+  const nowYear = new Date().getFullYear();
+  const series = [];
+  let adobeBal = rs.adobe401k.balance, churchBal = rs.church401k.balance, sal = rs.salary;
+  series.push({year: nowYear, adobe: adobeBal, church: churchBal, total: adobeBal + churchBal});
+  for(let i=1;i<=maxYears;i++){
+    const contribution = sal * (rs.adobe401k.employeePct + rs.adobe401k.matchPct) / 100;
+    adobeBal = adobeBal * (1 + rs.adobe401k.growthPct/100) + contribution;
+    churchBal = churchBal * (1 + rs.church401k.growthPct/100);
+    sal = sal * (1 + rs.raisePct/100);
+    series.push({year: nowYear + i, adobe: adobeBal, church: churchBal, total: adobeBal + churchBal});
+  }
+  return series;
+}
+
+function computeRetProjection(){
+  const rs = retState;
+  const nowYear = new Date().getFullYear();
+  const maxYears = Math.max(rs.pension.age59Year - nowYear, rs.pension.age62Year - nowYear, 0);
+  const series = buildRetSeries(rs, maxYears);
+  const atYear = targetYear => series.find(s => s.year === targetYear) || series[series.length-1];
+  function scenario(ageKey){
+    const isAge59 = ageKey === 59;
+    const targetYear = isAge59 ? rs.pension.age59Year : rs.pension.age62Year;
+    const point = atYear(targetYear);
+    const investmentMonthly = point.total * (rs.withdrawalRatePct/100) / 12;
+    const pensionMonthly = isAge59 ? rs.pension.age59Monthly : rs.pension.age62Monthly;
+    const ssMonthly = isAge59 ? 0 : rs.socialSecurityAge62Monthly;
+    const totalMonthly = investmentMonthly + pensionMonthly + ssMonthly;
+    const deficit = totalMonthly - rs.retirementExpensesMonthly;
+    return {year: targetYear, adobeBal: point.adobe, churchBal: point.church, totalBal: point.total, investmentMonthly, pensionMonthly, ssMonthly, totalMonthly, deficit};
+  }
+  return {series, age59: scenario(59), age62: scenario(62)};
+}
+
+function renderRetStats(proj){
+  const el = document.getElementById('retStats');
+  el.innerHTML = `
+    <div class="stat"><p class="label">Total invested · age 59</p><p class="value">${fmt(proj.age59.totalBal)}</p></div>
+    <div class="stat ${proj.age59.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Surplus / (deficit) · age 59</p><p class="value">${fmt(proj.age59.deficit)}</p></div>
+    <div class="stat"><p class="label">Total invested · age 62</p><p class="value">${fmt(proj.age62.totalBal)}</p></div>
+    <div class="stat ${proj.age62.deficit >= 0 ? 'good' : 'warn'}"><p class="label">Surplus / (deficit) · age 62</p><p class="value">${fmt(proj.age62.deficit)}</p></div>`;
+}
+
+function renderRetBreakdown(containerId, yearLabelId, scenario){
+  document.getElementById(yearLabelId).textContent = '(' + scenario.year + ')';
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  const rows = [
+    ['Church pension', scenario.pensionMonthly],
+    ['Social Security', scenario.ssMonthly],
+    ['401(k) income (' + retState.withdrawalRatePct + '%/yr withdrawal)', scenario.investmentMonthly],
+  ];
+  rows.forEach(([label, val])=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${fmt(val)}</span>`;
+    el.appendChild(row);
+  });
+  const totalRow = document.createElement('div');
+  totalRow.className = 'row total';
+  totalRow.innerHTML = `<span class="name">Total monthly income</span><span class="amt-wrap">${fmt(scenario.totalMonthly)}</span>`;
+  el.appendChild(totalRow);
+  const expRow = document.createElement('div');
+  expRow.className = 'row';
+  expRow.innerHTML = `<span class="name">Estimated monthly expenses</span><span class="amt-wrap">${fmt(retState.retirementExpensesMonthly)}</span>`;
+  el.appendChild(expRow);
+  const deficitRow = document.createElement('div');
+  deficitRow.className = 'row total ' + (scenario.deficit >= 0 ? 'ret-surplus' : 'ret-deficit');
+  deficitRow.innerHTML = `<span class="name">Surplus / (deficit)</span><span class="amt-wrap">${fmt(scenario.deficit)}</span>`;
+  el.appendChild(deficitRow);
+}
+
+function renderRetChart(proj){
+  const wrap = document.getElementById('retChartWrap');
+  const series = proj.series;
+  const W = 760, H = 260, ML = 54, MR = 16, MT = 16, MB = 28;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const minYear = series[0].year, maxYear = series[series.length-1].year;
+  const span = Math.max(maxYear - minYear, 1);
+  const maxVal = Math.max(...series.map(s => s.total)) * 1.08 || 1;
+  const xPos = year => ML + (year - minYear) / span * plotW;
+  const yPos = val => MT + plotH - (val / maxVal) * plotH;
+
+  let gridSvg = '';
+  const gridCount = 4;
+  for(let i=0;i<=gridCount;i++){
+    const val = maxVal * i / gridCount;
+    const gy = yPos(val);
+    gridSvg += `<line class="ret-gridline" x1="${ML}" x2="${W-MR}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}"/>`;
+    gridSvg += `<text class="ret-axis-label" x="${ML-8}" y="${(gy+3).toFixed(1)}" text-anchor="end">${fmtCompact(val)}</text>`;
+  }
+
+  const linePath = key => series.map((s,i) => (i===0?'M':'L') + xPos(s.year).toFixed(1) + ',' + yPos(s[key]).toFixed(1)).join(' ');
+
+  const milestones = [
+    {year: retState.pension.age59Year, label: '59'},
+    {year: retState.pension.age62Year, label: '62'},
+  ];
+  let milestoneSvg = '';
+  milestones.forEach(m=>{
+    if(m.year < minYear || m.year > maxYear) return;
+    const mx = xPos(m.year).toFixed(1);
+    milestoneSvg += `<line class="ret-milestone-line" x1="${mx}" x2="${mx}" y1="${MT}" y2="${MT+plotH}"/>`;
+    milestoneSvg += `<text class="ret-milestone-label" x="${mx}" y="${MT-4}" text-anchor="middle">Age ${m.label}</text>`;
+  });
+
+  const labelYears = [minYear, ...milestones.map(m=>m.year), maxYear].filter((v,i,a)=>a.indexOf(v)===i);
+  let yearLabelsSvg = '';
+  labelYears.forEach(yr=>{
+    yearLabelsSvg += `<text class="ret-axis-label" x="${xPos(yr).toFixed(1)}" y="${H-6}" text-anchor="middle">${yr}</text>`;
+  });
+
+  const last = series[series.length-1];
+  const endDots = [
+    ['total','var(--primary)'], ['adobe', RET_COLOR_ADOBE], ['church', RET_COLOR_CHURCH]
+  ].map(([key,color]) => `<circle cx="${xPos(last.year).toFixed(1)}" cy="${yPos(last[key]).toFixed(1)}" r="4" fill="${color}" stroke="var(--card)" stroke-width="2"/>`).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${gridSvg}
+      ${milestoneSvg}
+      <path d="${linePath('church')}" fill="none" stroke="${RET_COLOR_CHURCH}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath('adobe')}" fill="none" stroke="${RET_COLOR_ADOBE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath('total')}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${endDots}
+      ${yearLabelsSvg}
+    </svg>`;
+
+  const overlay = document.createElement('div');
+  overlay.style.position = 'absolute';
+  overlay.style.inset = '0';
+  overlay.style.cursor = 'crosshair';
+  wrap.appendChild(overlay);
+  const crosshair = document.createElement('div');
+  crosshair.className = 'ret-crosshair';
+  wrap.appendChild(crosshair);
+  const tooltip = document.createElement('div');
+  tooltip.className = 'ret-tooltip';
+  wrap.appendChild(tooltip);
+
+  function handleMove(clientX){
+    const rect = wrap.getBoundingClientRect();
+    const scale = rect.width / W;
+    const dataX = (clientX - rect.left) / scale;
+    const yearFloat = minYear + (dataX - ML) / plotW * span;
+    let nearest = series[0], nearestDist = Infinity;
+    series.forEach(s => { const d = Math.abs(s.year - yearFloat); if(d < nearestDist){ nearestDist = d; nearest = s; } });
+    const cxPx = xPos(nearest.year) * scale;
+    crosshair.style.left = cxPx + 'px';
+    crosshair.style.opacity = '1';
+    tooltip.style.left = Math.min(Math.max(cxPx, 70), rect.width - 70) + 'px';
+    tooltip.style.opacity = '1';
+    tooltip.innerHTML = `<div class="tt-title">${nearest.year}</div>
+      <div class="tt-row"><i style="background:var(--primary)"></i>Total<span class="tt-val">${fmt(nearest.total)}</span></div>
+      <div class="tt-row"><i style="background:${RET_COLOR_ADOBE}"></i>Adobe 401(k)<span class="tt-val">${fmt(nearest.adobe)}</span></div>
+      <div class="tt-row"><i style="background:${RET_COLOR_CHURCH}"></i>Church 401(k)<span class="tt-val">${fmt(nearest.church)}</span></div>`;
+  }
+  overlay.addEventListener('pointermove', e => handleMove(e.clientX));
+  overlay.addEventListener('pointerleave', () => { crosshair.style.opacity = '0'; tooltip.style.opacity = '0'; });
+
+  document.getElementById('retChartLegend').innerHTML = `
+    <span><i style="background:var(--primary)"></i>Total</span>
+    <span><i style="background:${RET_COLOR_ADOBE}"></i>Adobe 401(k)</span>
+    <span><i style="background:${RET_COLOR_CHURCH}"></i>Church 401(k)</span>`;
+}
+
+function retDispVal(val, kind){ return kind === 'dollar' ? commas(val) : val; }
+function retInputRow(container, label, path, kind){
+  const val = retGet(path);
+  const row = document.createElement('div');
+  row.className = 'row';
+  const prefix = kind === 'dollar' ? '<span class="cur">$</span>' : '';
+  const suffix = kind === 'percent' ? '<span class="cur pct">%</span>' : '';
+  const widthAttr = kind === 'year' ? ' style="width:76px;"' : '';
+  row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${prefix}<input type="text" inputmode="decimal" class="amt-input ret-input" data-path="${path}" data-kind="${kind}" value="${retDispVal(val, kind)}"${widthAttr}>${suffix}</span>`;
+  container.appendChild(row);
+}
+
+function renderRetExtra(){
+  const el = document.getElementById('retExtraRows');
+  el.innerHTML = '';
+  retInputRow(el, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
+  retInputRow(el, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
+}
+
+function renderRetAssumptions(){
+  const a = document.getElementById('retAssumpA');
+  a.innerHTML = '';
+  retInputRow(a, 'Current salary', 'salary', 'dollar');
+  retInputRow(a, 'Annual raise', 'raisePct', 'percent');
+  retInputRow(a, 'Adobe Roth 401(k) balance', 'adobe401k.balance', 'dollar');
+  retInputRow(a, 'Adobe 401(k) growth rate', 'adobe401k.growthPct', 'percent');
+  retInputRow(a, 'Adobe 401(k) contribution (you)', 'adobe401k.employeePct', 'percent');
+  retInputRow(a, 'Adobe 401(k) match (Adobe)', 'adobe401k.matchPct', 'percent');
+  retInputRow(a, 'Church Roth 401(k) balance', 'church401k.balance', 'dollar');
+  retInputRow(a, 'Church 401(k) growth rate', 'church401k.growthPct', 'percent');
+
+  const b = document.getElementById('retAssumpB');
+  b.innerHTML = '';
+  retInputRow(b, 'Church pension at 59', 'pension.age59Monthly', 'dollar');
+  retInputRow(b, 'Church pension at 62', 'pension.age62Monthly', 'dollar');
+  retInputRow(b, 'Age 59 year', 'pension.age59Year', 'year');
+  retInputRow(b, 'Age 62 year', 'pension.age62Year', 'year');
+  retInputRow(b, 'Social Security at 62', 'socialSecurityAge62Monthly', 'dollar');
+  retInputRow(b, '401(k) withdrawal rate', 'withdrawalRatePct', 'percent');
+  retInputRow(b, 'Estimated retirement expenses (monthly)', 'retirementExpensesMonthly', 'dollar');
+}
+
+function recalcRetirement(){
+  const proj = computeRetProjection();
+  renderRetStats(proj);
+  renderRetChart(proj);
+  renderRetBreakdown('retAge59Rows', 'retAge59YearLabel', proj.age59);
+  renderRetBreakdown('retAge62Rows', 'retAge62YearLabel', proj.age62);
+}
+
+function renderRetirement(){
+  recalcRetirement();
+  renderRetExtra();
+  renderRetAssumptions();
+}
+
+function setRetSaveStatus(kind){
+  const dot = document.getElementById('retSaveDot');
+  const text = document.getElementById('retSaveText');
+  if(!dot || !text) return;
+  dot.style.background = kind === 'synced' ? 'var(--good)' : kind === 'error' ? 'var(--warn)' : 'var(--ink-soft)';
+  text.textContent = kind === 'synced' ? 'synced' : kind === 'error' ? 'not saved' : 'saving…';
+}
+
+function queueRetSave(){
+  setRetSaveStatus('saving');
+  clearTimeout(retSaveTimer);
+  retSaveTimer = setTimeout(async ()=>{
+    try{
+      await window.storage.set(RET_STORE_KEY, JSON.stringify(retState), true);
+      setRetSaveStatus('synced');
+    }catch(err){
+      setRetSaveStatus('error');
+    }
+  }, 500);
+}
+
+async function loadRetirementState(){
+  try{
+    const result = await window.storage.get(RET_STORE_KEY, true);
+    retState = Object.assign(JSON.parse(JSON.stringify(defaultRetState)), JSON.parse(result.value));
+  }catch(err){
+    retState = JSON.parse(JSON.stringify(defaultRetState));
+    try{
+      const res = await window.storage.get(STORE_KEY, true);
+      const budgetState = JSON.parse(res.value);
+      const p1 = (budgetState.p1||[]).reduce((s,i)=>s+i.val,0) + (budgetState.subs||[]).reduce((s,i)=>s+i.val,0);
+      const p2 = (budgetState.p2||[]).reduce((s,i)=>s+i.val,0);
+      const pp = budgetState.payPeriods || 26;
+      const monthlyExpense = Math.round((p1+p2) * (pp/2) / 12);
+      if(monthlyExpense > 0) retState.retirementExpensesMonthly = monthlyExpense;
+    }catch(err2){ /* keep fallback default */ }
+  }
+}
+
+function attachRetirementHandlers(){
+  const root = document.getElementById('page-retirement');
+  root.addEventListener('input', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('ret-input')) return;
+    const num = parseFloat(t.value.replace(/,/g,'')) || 0;
+    retSet(t.dataset.path, num);
+    recalcRetirement();
+    queueRetSave();
+  });
+  root.addEventListener('focusin', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('ret-input') || t.dataset.kind !== 'dollar') return;
+    const v = retGet(t.dataset.path);
+    t.value = v === 0 ? '' : String(v);
+  });
+  root.addEventListener('focusout', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('ret-input') || t.dataset.kind !== 'dollar') return;
+    t.value = commas(retGet(t.dataset.path));
+  });
+}
+
 function showPage(page){
   document.getElementById('page-ledger').style.display = page === 'ledger' ? 'block' : 'none';
   document.getElementById('page-retirement').style.display = page === 'retirement' ? 'block' : 'none';
@@ -1015,6 +1399,10 @@ async function init(){
     await seedHistoricalSheets();
   }
   await loadSheet('2026');
+
+  attachRetirementHandlers();
+  await loadRetirementState();
+  renderRetirement();
 }
 
 init();
