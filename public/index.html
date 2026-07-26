@@ -162,9 +162,45 @@
   .foot-note{font-size:12px;color:var(--ink-soft);margin-top:1.5rem;text-align:center;}
   .save-flag{font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:.3rem;}
 
+  .pills-row{display:flex;align-items:flex-start;margin-bottom:1.25rem;}
+  .pills-bar{display:flex;flex-wrap:wrap;gap:.5rem;}
+  .pill{
+    font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+    border:1.5px solid var(--line);background:var(--card);color:var(--ink-soft);
+    padding:.45rem .5rem .45rem .9rem;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;gap:.4rem;transition:all .15s;
+  }
+  .pill:hover{border-color:var(--field-border-hover);background:var(--primary-tint);}
+  .pill.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .pill-x{
+    width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:13px;line-height:1;color:inherit;opacity:.55;flex-shrink:0;
+  }
+  .pill-x:hover{opacity:1;background:rgba(0,0,0,.15);}
+  .pill.pill-add{padding:.45rem .7rem;color:var(--primary);border-style:dashed;font-size:16px;line-height:1;}
+
+  .add-sheet-panel{
+    display:none;align-items:center;gap:.6rem;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem;margin-bottom:1.25rem;
+  }
+  .add-sheet-panel label{font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:.25rem;}
+  .add-sheet-panel input[type=text]{width:130px;}
+  .add-sheet-panel select{
+    font-family:'Inter',sans-serif;font-size:13.5px;font-weight:500;color:var(--ink);
+    border:1.5px solid var(--field-border);background:var(--field-bg);border-radius:9px;padding:.4rem .6rem;
+  }
+
+  body.readonly-view .row-remove,body.readonly-view .add-btn{display:none;}
+  body.readonly-view .drag-handle{visibility:hidden;}
+  body.readonly-view .catdot{pointer-events:none;}
+  body.readonly-view input.name-input:disabled,body.readonly-view input.amt-input:disabled{
+    color:var(--ink);opacity:1;-webkit-text-fill-color:var(--ink);cursor:default;
+  }
+  body.readonly-view #payPeriods:disabled{color:#fff;opacity:1;-webkit-text-fill-color:#fff;cursor:default;}
+
   @media print{
     body{background:#fff;}
-    .actions,.foot-note,.save-flag,.row-remove,.add-btn,details:not([open]) .sub-body{display:none;}
+    .actions,.foot-note,.save-flag,.row-remove,.add-btn,.pills-row,.add-sheet-panel,details:not([open]) .sub-body{display:none;}
     .card,.annual,.stat,summary{border:1px solid #999 !important;box-shadow:none !important;}
     .wrap{padding:0;max-width:100%;}
     input[type=number],input[type=text]{border:none !important;background:none !important;}
@@ -184,6 +220,16 @@
       <span class="save-flag" id="saveFlag"><i>●</i> synced</span>
       <button class="primary" onclick="window.print()">Print</button>
     </div>
+  </div>
+
+  <div class="pills-row">
+    <div class="pills-bar" id="pillsBar"></div>
+  </div>
+  <div class="add-sheet-panel" id="addSheetPanel">
+    <label>Name<input type="text" id="newSheetName"></label>
+    <label>Copy from<select id="newSheetCopyFrom"></select></label>
+    <button class="primary" id="newSheetCreate" type="button">Create</button>
+    <button id="newSheetCancel" type="button">Cancel</button>
   </div>
 
   <div class="stats">
@@ -326,8 +372,17 @@ const defaultState = {
   ]
 };
 
+// One-time-seeded historical budgets (2006-2025), parsed from the household
+// spreadsheet archive. Historical income items carry a `kind` tag instead of
+// the live sheet's exact label text, since label wording varies by year.
+const HISTORICAL_DATA = {"2006":{"year":2006,"income":[{"label":"Gross Annual Salary","val":55764.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":4647.0,"kind":"other"},{"label":"Gross Paycheck","val":2145.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":1692.0,"kind":"netPaycheck"},{"label":"Net Monthly Payment","val":3384.0,"kind":"other"}],"p1":[{"label":"Car Payment","val":430.0,"cat":"transport"},{"label":"Cable","val":35.0,"cat":"housing"},{"label":"HOA","val":11.0,"cat":"housing"},{"label":"Car Insurance","val":110.0,"cat":"transport"},{"label":"Cell Phones","val":55.0,"cat":"everyday"},{"label":"Gas bill","val":30.0,"cat":"housing"},{"label":"City bill","val":100.0,"cat":"housing"},{"label":"Phone bill","val":25.0,"cat":"housing"},{"label":"Internet","val":15.0,"cat":"housing"},{"label":"Gas","val":100.0,"cat":"everyday"},{"label":"Tithing/FO","val":255.0,"cat":"giving"},{"label":"Groceries","val":350.0,"cat":"everyday"},{"label":"Diapers","val":25.0,"cat":"everyday"},{"label":"PreSchool","val":55.0,"cat":"everyday"},{"label":"Dating","val":50.0,"cat":"everyday"},{"label":"Spending","val":246.0,"cat":"everyday"},{"label":"Landscape Loan","val":50.0,"cat":"transport"}],"p2":[{"label":"Mortgage #1","val":1122.0,"cat":"housing"},{"label":"Mortgage #2","val":336.0,"cat":"housing"},{"label":"Tithing","val":215.0,"cat":"giving"},{"label":"Spending","val":19.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2007":{"year":2007,"income":[{"label":"Gross Annual Salary","val":59676.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":4973.0,"kind":"other"},{"label":"Gross Paycheck","val":2295.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":1780.0,"kind":"netPaycheck"},{"label":"Net Monthly Payment","val":3560.0,"kind":"other"}],"p1":[{"label":"Car Payment","val":430.0,"cat":"transport"},{"label":"Cable","val":37.0,"cat":"housing"},{"label":"HOA","val":10.0,"cat":"housing"},{"label":"Car Insurance","val":125.0,"cat":"transport"},{"label":"Cell Phones","val":61.0,"cat":"everyday"},{"label":"Gas bill","val":60.0,"cat":"housing"},{"label":"City bill","val":140.0,"cat":"housing"},{"label":"Qwest bill (Internet/Phone)","val":67.0,"cat":"housing"},{"label":"Gas","val":100.0,"cat":"everyday"},{"label":"Tithing","val":230.0,"cat":"giving"},{"label":"Fast Offerings","val":50.0,"cat":"giving"},{"label":"Groceries","val":350.0,"cat":"everyday"},{"label":"Diapers","val":25.0,"cat":"everyday"},{"label":"PreSchool","val":55.0,"cat":"everyday"},{"label":"Out to Eat","val":40.0,"cat":"everyday"},{"label":"Spending","val":265.0,"cat":"everyday"}],"p2":[{"label":"Mortgage #1","val":1122.0,"cat":"housing"},{"label":"Mortgage #2","val":336.0,"cat":"housing"},{"label":"Tithing","val":230.0,"cat":"giving"},{"label":"Donations","val":7.0,"cat":"everyday"},{"label":"Dad Loan","val":50.0,"cat":"transport"}],"subs":[],"payPeriods":26},"2008":{"year":2008,"income":[{"label":"Gross Annual Salary","val":63852.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":5321.0,"kind":"other"},{"label":"Gross Paycheck","val":2455.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":1865.0,"kind":"netPaycheck"},{"label":"Net \"Monthly\" Payment","val":3995.0,"kind":"other"}],"p1":[{"label":"Car Payment","val":430.0,"cat":"transport"},{"label":"Cable","val":39.0,"cat":"housing"},{"label":"HOA","val":7.0,"cat":"housing"},{"label":"Car Insurance","val":120.0,"cat":"transport"},{"label":"Cell Phones","val":45.0,"cat":"everyday"},{"label":"Gas bill","val":60.0,"cat":"housing"},{"label":"City bill","val":138.0,"cat":"housing"},{"label":"Qwest bill (Internet/Phone)","val":65.0,"cat":"housing"},{"label":"Gas","val":120.0,"cat":"everyday"},{"label":"Tithing","val":246.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"Groceries","val":425.0,"cat":"everyday"},{"label":"Diapers","val":20.0,"cat":"everyday"},{"label":"Savings (MM)","val":10.0,"cat":"everyday"},{"label":"Out to Eat","val":40.0,"cat":"everyday"},{"label":"Extra Spending","val":265.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1592.0,"cat":"housing"},{"label":"Tithing","val":246.0,"cat":"giving"},{"label":"Food Storage","val":27.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2009":{"year":2009,"income":[{"label":"Gross Annual Salary","val":71724.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":5977.0,"kind":"other"},{"label":"Gross Paycheck","val":2759.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2075.0,"kind":"netPaycheck"},{"label":"Net \"Monthly\" Payment","val":4470.0,"kind":"other"}],"p1":[{"label":"Tithing","val":276.0,"cat":"giving"},{"label":"Fast Offerings","val":110.0,"cat":"giving"},{"label":"Car Insurance","val":120.0,"cat":"transport"},{"label":"Cell Phones","val":50.0,"cat":"everyday"},{"label":"Gas bill","val":60.0,"cat":"housing"},{"label":"City bill","val":135.0,"cat":"housing"},{"label":"Qwest bill (Internet/Phone)","val":65.0,"cat":"housing"},{"label":"Gas (car)","val":95.0,"cat":"transport"},{"label":"Car Payment","val":430.0,"cat":"transport"},{"label":"Cable","val":50.0,"cat":"housing"},{"label":"Groceries","val":425.0,"cat":"everyday"},{"label":"Diapers","val":20.0,"cat":"everyday"},{"label":"Savings (MM)","val":65.0,"cat":"everyday"},{"label":"Out to Eat","val":72.0,"cat":"everyday"},{"label":"Extra Spending","val":415.0,"cat":"everyday"},{"label":"HOA dues","val":7.0,"cat":"housing"}],"p2":[{"label":"Mortgage- $1592","val":1592.0,"cat":"housing"},{"label":"Tithing- $276","val":276.0,"cat":"giving"},{"label":"Food Storage-$100","val":100.0,"cat":"everyday"},{"label":"Extra Spending-$115","val":107.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2010":{"year":2010,"income":[{"label":"Gross Annual Salary","val":75312.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":6276.0,"kind":"other"},{"label":"Gross Paycheck","val":2897.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2135.0,"kind":"netPaycheck"},{"label":"Net Monthly Income","val":4945.0,"kind":"other"}],"p1":[{"label":"Tithing","val":325.0,"cat":"giving"},{"label":"Fast Offerings","val":115.0,"cat":"giving"},{"label":"Car Insurance","val":103.0,"cat":"transport"},{"label":"Cell Phones","val":50.0,"cat":"everyday"},{"label":"Gas bill","val":60.0,"cat":"housing"},{"label":"City bill","val":135.0,"cat":"housing"},{"label":"Qwest bill (Internet/Phone)","val":67.0,"cat":"housing"},{"label":"Gas (car)","val":100.0,"cat":"transport"},{"label":"Car Payment","val":430.0,"cat":"transport"},{"label":"Direct TV (CC)","val":65.0,"cat":"everyday"},{"label":"Groceries","val":500.0,"cat":"everyday"},{"label":"Diapers","val":20.0,"cat":"everyday"},{"label":"Out to Eat","val":100.0,"cat":"everyday"},{"label":"Extra Spending","val":740.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1572.0,"cat":"housing"},{"label":"Tithing","val":290.0,"cat":"giving"},{"label":"Fence Loan Payment","val":155.0,"cat":"transport"},{"label":"Extra Spending","val":118.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2011":{"year":2011,"income":[{"label":"Gross Annual Salary","val":88068.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":7339.0,"kind":"other"},{"label":"IDC Income / year","val":7200.0,"kind":"idc"},{"label":"Gross Paycheck","val":3387.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2530.0,"kind":"netPaycheck"},{"label":"Net Monthly Income","val":5060.0,"kind":"other"}],"p1":[{"label":"Tithing","val":339.0,"cat":"giving"},{"label":"Fast Offerings","val":140.0,"cat":"giving"},{"label":"Car Insurance","val":122.0,"cat":"transport"},{"label":"Cell Phones","val":70.0,"cat":"everyday"},{"label":"Gas bill","val":65.0,"cat":"housing"},{"label":"City bill","val":160.0,"cat":"housing"},{"label":"Century Link  phone bill","val":35.0,"cat":"housing"},{"label":"Digis internet bill","val":47.0,"cat":"housing"},{"label":"Gas (car)","val":117.0,"cat":"transport"},{"label":"Direct TV","val":70.0,"cat":"everyday"},{"label":"Groceries","val":620.0,"cat":"everyday"},{"label":"Out to Eat","val":100.0,"cat":"everyday"},{"label":"Weight Watchers","val":45.0,"cat":"everyday"},{"label":"Extra Spending","val":600.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1572.0,"cat":"housing"},{"label":"Tithing","val":339.0,"cat":"giving"},{"label":"Fence Loan Payment (x2)","val":155.0,"cat":"transport"},{"label":"Extra Spending","val":464.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2012":{"year":2012,"income":[{"label":"Gross Annual Salary","val":93794.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":7816.0,"kind":"other"},{"label":"IDC Income / year","val":4800.0,"kind":"idc"},{"label":"Gross Paycheck","val":3607.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2507.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":361.0,"cat":"giving"},{"label":"Fast Offerings","val":150.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":122.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":90.0,"cat":"housing"},{"label":"Questar Gas bill","val":65.0,"cat":"housing"},{"label":"City bill","val":65.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":120.0,"cat":"housing"},{"label":"Century Link phone bill","val":35.0,"cat":"housing"},{"label":"Digis internet bill","val":52.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Direct TV","val":70.0,"cat":"everyday"},{"label":"Groceries","val":620.0,"cat":"everyday"},{"label":"Out to Eat","val":90.0,"cat":"everyday"},{"label":"Karate/Dance","val":145.0,"cat":"everyday"},{"label":"Extra Spending","val":322.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1713.0,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Tithing","val":361.0,"cat":"giving"},{"label":"Extra Spending","val":368.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2013":{"year":2013,"income":[{"label":"Gross Annual Salary","val":98015.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":8168.0,"kind":"other"},{"label":"IDC Income / year","val":7200.0,"kind":"idc"},{"label":"Gross Paycheck","val":3770.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2630.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":380.0,"cat":"giving"},{"label":"Fast Offerings","val":150.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":122.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":90.0,"cat":"housing"},{"label":"Questar Gas bill","val":65.0,"cat":"housing"},{"label":"City bill","val":75.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":110.0,"cat":"housing"},{"label":"Century Link phone bill","val":35.0,"cat":"housing"},{"label":"Digis internet bill","val":52.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Direct TV","val":70.0,"cat":"everyday"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Out to Eat","val":90.0,"cat":"everyday"},{"label":"Karate","val":145.0,"cat":"everyday"},{"label":"Extra Spending","val":249.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1713.0,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Tithing","val":380.0,"cat":"giving"},{"label":"Extra Spending","val":475.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2014":{"year":2014,"income":[{"label":"Gross Annual Salary","val":106605.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":8883.75,"kind":"other"},{"label":"IDC Income / year","val":7200.0,"kind":"idc"},{"label":"Gross Paycheck","val":4100.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":2892.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":410.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":144.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":65.0,"cat":"housing"},{"label":"Questar Gas bill","val":84.0,"cat":"housing"},{"label":"City bill","val":75.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":163.0,"cat":"housing"},{"label":"Digis internet bill","val":58.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Dish TV","val":50.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Karate","val":150.0,"cat":"everyday"},{"label":"Credit Card","val":350.0,"cat":"everyday"},{"label":"Preschool","val":80.0,"cat":"everyday"},{"label":"Extra Spending","val":163.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1847.03,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Car Loan","val":368.0,"cat":"transport"},{"label":"Tithing","val":410.0,"cat":"giving"},{"label":"Extra Spending","val":202.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2015":{"year":2015,"income":[{"label":"Gross Annual Salary","val":116600.0,"kind":"salary"},{"label":"Gross Monthly Payment","val":9800.0,"kind":"other"},{"label":"IDC Income / year","val":6000.0,"kind":"idc"},{"label":"Gross Paycheck","val":4523.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":3375.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":453.0,"cat":"giving"},{"label":"Fast Offerings","val":75.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":144.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":65.0,"cat":"housing"},{"label":"Questar Gas bill","val":84.0,"cat":"housing"},{"label":"City bill","val":75.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":163.0,"cat":"housing"},{"label":"Digis internet bill","val":58.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Dish TV","val":51.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Karate","val":143.0,"cat":"everyday"},{"label":"Credit Card","val":400.0,"cat":"everyday"},{"label":"Preschool","val":80.0,"cat":"everyday"},{"label":"Extra Spending","val":584.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1847.03,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Car Loan (Van)","val":350.0,"cat":"transport"},{"label":"Car Loan (Car)","val":275.0,"cat":"transport"},{"label":"Tithing","val":453.0,"cat":"giving"},{"label":"Extra Spending","val":385.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2016":{"year":2016,"income":[{"label":"Gross Annual Salary","val":125008.0,"kind":"salary"},{"label":"Gross Paycheck","val":4808.0,"kind":"grossPaycheck"},{"label":"IDC Income / year","val":10200.0,"kind":"idc"},{"label":"Net Paycheck","val":3656.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":481.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":183.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":60.0,"cat":"housing"},{"label":"Questar Gas bill","val":85.0,"cat":"housing"},{"label":"City bill","val":75.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":163.0,"cat":"housing"},{"label":"Internet bill","val":58.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Dish TV","val":75.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Credit Card","val":398.0,"cat":"everyday"},{"label":"Instrumental Rental","val":125.0,"cat":"housing"},{"label":"Cloud Services","val":30.0,"cat":"subs"},{"label":"IDC/PMC Business Expenses","val":43.0,"cat":"everyday"},{"label":"Extra Spending","val":780.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1857.0,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Car Loan (Van)","val":510.0,"cat":"transport"},{"label":"Car Loan (Car)","val":235.0,"cat":"transport"},{"label":"Tithing","val":481.0,"cat":"giving"},{"label":"Extra Spending","val":508.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2017":{"year":2017,"income":[{"label":"Gross Annual Salary","val":129063.0,"kind":"salary"},{"label":"Gross Paycheck","val":4964.0,"kind":"grossPaycheck"},{"label":"IDC Income / year","val":10200.0,"kind":"idc"},{"label":"Net Paycheck","val":3753.0,"kind":"netPaycheck"}],"p1":[{"label":"Tithing","val":497.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":183.0,"cat":"transport"},{"label":"T-Mobile Cell Phone","val":60.0,"cat":"housing"},{"label":"Questar Gas bill","val":85.0,"cat":"housing"},{"label":"City bill","val":75.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":163.0,"cat":"housing"},{"label":"Internet bill","val":58.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Dish TV","val":75.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Credit Card","val":398.0,"cat":"everyday"},{"label":"Instrumental Rental","val":125.0,"cat":"housing"},{"label":"Cloud Services","val":30.0,"cat":"subs"},{"label":"IDC/PMC Business Expenses","val":43.0,"cat":"everyday"},{"label":"Extra Spending","val":871.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1856.0,"cat":"housing"},{"label":"HOA","val":65.0,"cat":"housing"},{"label":"Car Loan (Van)","val":510.0,"cat":"transport"},{"label":"Car Loan (Car)","val":235.0,"cat":"transport"},{"label":"Tithing","val":497.0,"cat":"giving"},{"label":"Extra Spending","val":600.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2018":{"year":2018,"income":[{"label":"Gross Annual Salary","val":139524.0,"kind":"salary"},{"label":"Montly Rate","val":11627.0,"kind":"other"},{"label":"Gross Paycheck","val":5366.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4105.0,"kind":"netPaycheck"},{"label":"IDC Monthly Income","val":9600.0,"kind":"idc"}],"p1":[{"label":"Tithing","val":537.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":199.0,"cat":"transport"},{"label":"Questar Gas bill","val":90.0,"cat":"housing"},{"label":"City bill","val":110.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":141.0,"cat":"housing"},{"label":"Internet bill","val":50.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"Dish TV","val":75.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"HELOC Loan","val":500.0,"cat":"transport"},{"label":"Instrumental Rental","val":83.0,"cat":"housing"},{"label":"Orthodonics","val":150.0,"cat":"everyday"},{"label":"Cloud Subscriptions","val":60.0,"cat":"subs"},{"label":"Extra Spending","val":1010.0,"cat":"everyday"}],"p2":[{"label":"Mortgage","val":1874.0,"cat":"housing"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"T-Mobile Bill","val":75.0,"cat":"housing"},{"label":"Car Loan (Van)","val":511.0,"cat":"transport"},{"label":"Car Loan (Car)","val":234.0,"cat":"transport"},{"label":"Tithing","val":537.0,"cat":"giving"},{"label":"Extra Spending","val":810.0,"cat":"everyday"}],"subs":[],"payPeriods":26},"2019":{"year":2019,"income":[{"label":"Gross Annual Salary","val":143700.0,"kind":"salary"},{"label":"Montly Rate","val":11975.0,"kind":"other"},{"label":"Gross Paycheck","val":5527.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4155.0,"kind":"netPaycheck"},{"label":"IDC Monthly Income","val":15000.0,"kind":"idc"}],"p1":[{"label":"Tithing","val":553.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":273.0,"cat":"transport"},{"label":"Questar Gas bill","val":90.0,"cat":"housing"},{"label":"City bill","val":100.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":130.0,"cat":"housing"},{"label":"Internet bill","val":50.0,"cat":"housing"},{"label":"Gas (car)","val":300.0,"cat":"transport"},{"label":"DirectTV Now","val":50.0,"cat":"everyday"},{"label":"Groceries","val":900.0,"cat":"everyday"},{"label":"Deseret First HELOC Loan","val":350.0,"cat":"transport"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (Corolla)","val":237.0,"cat":"transport"},{"label":"School Lunches","val":160.0,"cat":"everyday"},{"label":"Extra Spending","val":724.0,"cat":"everyday"}],"p2":[{"label":"Tithing","val":553.0,"cat":"giving"},{"label":"Stash","val":50.0,"cat":"subs"},{"label":"Mortgage","val":1860.0,"cat":"housing"},{"label":"T-Mobile Bill","val":75.0,"cat":"housing"},{"label":"Car Loan (Camry)","val":195.0,"cat":"transport"},{"label":"Car Loan (Van)","val":511.0,"cat":"transport"},{"label":"Extra Spending","val":911.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":15.0,"cat":"subs"},{"label":"Dropbox","val":11.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Ooma","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":18.0,"cat":"subs"},{"label":"xBox Live","val":11.0,"cat":"subs"},{"label":"Stash","val":1.0,"cat":"subs"},{"label":"CBS","val":6.0,"cat":"everyday"}],"payPeriods":26},"2020":{"year":2020,"income":[{"label":"Gross Annual Salary","val":151827.0,"kind":"salary"},{"label":"Monthly Rate","val":12652.0,"kind":"other"},{"label":"Gross Paycheck","val":5842.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4352.0,"kind":"netPaycheck"},{"label":"IDC Monthly Income","val":14400.0,"kind":"idc"}],"p1":[{"label":"Tithing","val":585.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":417.0,"cat":"transport"},{"label":"Questar Gas bill","val":90.0,"cat":"housing"},{"label":"City bill","val":104.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":130.0,"cat":"housing"},{"label":"Internet bill","val":50.0,"cat":"housing"},{"label":"Gas (car)","val":300.0,"cat":"transport"},{"label":"AT&TV Now","val":50.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Deseret First HELOC Loan","val":350.0,"cat":"transport"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (Corolla)","val":237.0,"cat":"transport"},{"label":"Car Loan (Camry)","val":195.0,"cat":"transport"},{"label":"School Lunches","val":110.0,"cat":"everyday"},{"label":"Extra Spending","val":636.0,"cat":"everyday"}],"p2":[{"label":"Tithing","val":585.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage","val":1860.0,"cat":"housing"},{"label":"T-Mobile Bill","val":45.0,"cat":"housing"},{"label":"Car Loan (Van)","val":511.0,"cat":"transport"},{"label":"Extra Spending","val":1281.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":15.0,"cat":"subs"},{"label":"Dropbox","val":11.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":18.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":11.0,"cat":"subs"},{"label":"Stash","val":1.0,"cat":"subs"},{"label":"Disney+","val":7.0,"cat":"subs"},{"label":"Dashlane","val":8.0,"cat":"subs"},{"label":"Buffer","val":15.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"}],"payPeriods":26},"2021":{"year":2021,"income":[{"label":"Gross Annual Salary","val":155906.0,"kind":"salary"},{"label":"Monthly Rate","val":12992.0,"kind":"other"},{"label":"Gross Paycheck","val":5997.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4558.0,"kind":"netPaycheck"},{"label":"IDC Income","val":14400.0,"kind":"idc"}],"p1":[{"label":"Tithing","val":600.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":326.0,"cat":"transport"},{"label":"Questar Gas bill","val":82.0,"cat":"housing"},{"label":"City bill","val":104.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":143.0,"cat":"housing"},{"label":"Internet bill","val":85.0,"cat":"housing"},{"label":"Gas (car)","val":200.0,"cat":"transport"},{"label":"AT&TV Now","val":65.0,"cat":"housing"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"Deseret First HELOC Loan","val":350.0,"cat":"transport"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (Corolla)","val":237.0,"cat":"transport"},{"label":"Car Loan (Camry)","val":195.0,"cat":"transport"},{"label":"School Lunches","val":110.0,"cat":"everyday"},{"label":"Extra Spending","val":961.0,"cat":"everyday"}],"p2":[{"label":"Tithing","val":600.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage","val":1889.0,"cat":"housing"},{"label":"T-Mobile Bill","val":75.0,"cat":"housing"},{"label":"Car Loan (Van)","val":511.0,"cat":"transport"},{"label":"Noah Mission","val":250.0,"cat":"everyday"},{"label":"Zach Mission","val":250.0,"cat":"everyday"},{"label":"Extra Spending","val":913.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":17.0,"cat":"subs"},{"label":"Dropbox","val":13.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":18.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":8.0,"cat":"subs"},{"label":"Stash","val":1.0,"cat":"subs"},{"label":"Disney+","val":8.0,"cat":"subs"},{"label":"Dashlane","val":8.0,"cat":"subs"},{"label":"Buffer","val":15.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"}],"payPeriods":26},"2022":{"year":2022,"income":[{"label":"Gross Annual Salary","val":170987.0,"kind":"salary"},{"label":"Gross Paycheck","val":6576.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4515.0,"kind":"netPaycheck"},{"label":"Stock Contribution/Paycheck","val":196.0,"kind":"other"},{"label":"401K Contribution/Paycheck","val":196.0,"kind":"other"},{"label":"Adobe Annual Bonus","val":34000.0,"kind":"bonus"},{"label":"IDC Income","val":26000.0,"kind":"idc"}],"p1":[{"label":"Tithing (Adobe)","val":658.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":318.0,"cat":"transport"},{"label":"Questar Gas bill","val":85.0,"cat":"housing"},{"label":"City bill","val":131.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":140.0,"cat":"housing"},{"label":"Internet bill","val":85.0,"cat":"housing"},{"label":"Gas (car)","val":250.0,"cat":"transport"},{"label":"AT&TV Now","val":65.0,"cat":"housing"},{"label":"Groceries","val":850.0,"cat":"everyday"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (K5) Kia Finance","val":567.0,"cat":"transport"},{"label":"Car Loan (Corolla) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Camry) America First","val":195.0,"cat":"transport"},{"label":"Extra Spending","val":1022.0,"cat":"everyday"}],"p2":[{"label":"Tithing (Adobe)","val":658.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage (Mr Cooper)","val":2175.0,"cat":"housing"},{"label":"T-Mobile Bill","val":75.0,"cat":"housing"},{"label":"Car Loan (Van) US Bank","val":468.0,"cat":"transport"},{"label":"Zach Mission","val":300.0,"cat":"everyday"},{"label":"Extra Spending","val":626.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":18.0,"cat":"subs"},{"label":"Dropbox","val":13.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":20.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":8.0,"cat":"subs"},{"label":"Stash","val":3.0,"cat":"subs"},{"label":"Disney+","val":9.0,"cat":"subs"},{"label":"Dashlane","val":4.0,"cat":"subs"},{"label":"Buffer","val":15.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"},{"label":"PBS","val":5.0,"cat":"subs"}],"payPeriods":26},"2023":{"year":2023,"income":[{"label":"Gross Annual Salary","val":175270.0,"kind":"salary"},{"label":"Gross Paycheck","val":6790.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4732.0,"kind":"netPaycheck"},{"label":"Stock Contribution/Paycheck","val":196.0,"kind":"other"},{"label":"401K Contribution/Paycheck","val":135.0,"kind":"other"},{"label":"Adobe Annual Bonus","val":35000.0,"kind":"bonus"},{"label":"IDC Income","val":26000.0,"kind":"idc"},{"label":"BYU Income","val":600.0,"kind":"byu"}],"p1":[{"label":"Tithing (Adobe)","val":680.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":635.0,"cat":"transport"},{"label":"Questar Gas bill","val":96.0,"cat":"housing"},{"label":"City bill","val":131.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":140.0,"cat":"housing"},{"label":"Internet bill","val":85.0,"cat":"housing"},{"label":"Gas (car)","val":250.0,"cat":"transport"},{"label":"DirectTV Stream","val":80.0,"cat":"everyday"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (K5) Kia Finance","val":567.0,"cat":"transport"},{"label":"Car Loan (Corolla) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Altima) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Camry) America First","val":195.0,"cat":"transport"},{"label":"Extra Spending","val":652.0,"cat":"everyday"}],"p2":[{"label":"Tithing (Adobe)","val":680.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage (Mr Cooper)","val":2273.0,"cat":"housing"},{"label":"T-Mobile Bill","val":108.0,"cat":"housing"},{"label":"Car Loan (Van) US Bank","val":468.0,"cat":"transport"},{"label":"Extra Spending","val":1033.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":22.0,"cat":"subs"},{"label":"Dropbox","val":13.0,"cat":"subs"},{"label":"VidAngel","val":10.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":20.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":8.0,"cat":"subs"},{"label":"Stash","val":3.0,"cat":"subs"},{"label":"Disney+","val":9.0,"cat":"subs"},{"label":"Dashlane","val":4.0,"cat":"subs"},{"label":"Buffer","val":15.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"},{"label":"PBS","val":5.0,"cat":"subs"}],"payPeriods":26},"2024":{"year":2024,"income":[{"label":"Gross Annual Salary","val":183218.0,"kind":"salary"},{"label":"Gross Paycheck","val":7047.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":4922.0,"kind":"netPaycheck"},{"label":"Stock Contribution/Paycheck","val":210.0,"kind":"other"},{"label":"401K Contribution/Paycheck","val":140.0,"kind":"other"},{"label":"Adobe Annual Bonus","val":37000.0,"kind":"bonus"},{"label":"IDC Income","val":26000.0,"kind":"idc"},{"label":"BYU Income","val":600.0,"kind":"byu"}],"p1":[{"label":"Tithing (Adobe)","val":705.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":635.0,"cat":"transport"},{"label":"Questar Gas bill","val":96.0,"cat":"housing"},{"label":"City bill","val":131.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":140.0,"cat":"housing"},{"label":"Internet bill","val":85.0,"cat":"housing"},{"label":"Gas (car)","val":250.0,"cat":"transport"},{"label":"DirectTV Stream","val":80.0,"cat":"everyday"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Car Loan (K5) Kia Finance","val":567.0,"cat":"transport"},{"label":"Car Loan (Corolla) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Altima) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Camry) America First","val":195.0,"cat":"transport"},{"label":"Extra Spending","val":817.0,"cat":"everyday"}],"p2":[{"label":"Tithing (Adobe)","val":705.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage (Mr Cooper)","val":2273.0,"cat":"housing"},{"label":"T-Mobile Bill","val":108.0,"cat":"housing"},{"label":"Car Loan (Van) US Bank","val":468.0,"cat":"transport"},{"label":"Extra Spending","val":1198.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":22.0,"cat":"subs"},{"label":"Dropbox","val":13.0,"cat":"subs"},{"label":"VidAngel","val":10.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":20.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":8.0,"cat":"subs"},{"label":"Stash","val":3.0,"cat":"subs"},{"label":"Disney+","val":9.0,"cat":"subs"},{"label":"Dashlane","val":4.0,"cat":"subs"},{"label":"Buffer","val":15.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"},{"label":"PBS","val":5.0,"cat":"subs"}],"payPeriods":26},"2025":{"year":2025,"income":[{"label":"Gross Annual Salary","val":188297.0,"kind":"salary"},{"label":"Gross Paycheck","val":7292.0,"kind":"grossPaycheck"},{"label":"Net Paycheck","val":5013.0,"kind":"netPaycheck"},{"label":"Stock Contribution/Paycheck","val":217.0,"kind":"other"},{"label":"401K Contribution/Paycheck","val":217.0,"kind":"other"},{"label":"Adobe Annual Bonus","val":37660.0,"kind":"bonus"},{"label":"IDC Income","val":20000.0,"kind":"idc"},{"label":"BYU Income","val":600.0,"kind":"byu"}],"p1":[{"label":"Tithing (Adobe)","val":730.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Fast Offerings","val":100.0,"cat":"giving"},{"label":"State Farm Car Insurance","val":738.0,"cat":"transport"},{"label":"Questar Gas bill","val":96.0,"cat":"housing"},{"label":"City bill","val":140.0,"cat":"housing"},{"label":"Rocky Mountain Electric Bill","val":140.0,"cat":"housing"},{"label":"Internet bill","val":90.0,"cat":"housing"},{"label":"Gas (car)","val":250.0,"cat":"transport"},{"label":"DirectTV Stream","val":80.0,"cat":"everyday"},{"label":"Groceries","val":800.0,"cat":"everyday"},{"label":"HOA","val":64.0,"cat":"housing"},{"label":"Tesla (pay on mobile app)","val":611.0,"cat":"transport"},{"label":"Car Loan (Corolla) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Altima) America First","val":0.0,"cat":"transport"},{"label":"Car Loan (Kia) Carmax Finance","val":0.0,"cat":"transport"},{"label":"Extra Spending","val":841.0,"cat":"everyday"}],"p2":[{"label":"Tithing (Adobe)","val":705.0,"cat":"giving"},{"label":"Tithing (IDC)","val":100.0,"cat":"giving"},{"label":"Stash (Savings)","val":70.0,"cat":"subs"},{"label":"Mortgage (Mr Cooper)","val":2273.0,"cat":"housing"},{"label":"T-Mobile Bill","val":108.0,"cat":"housing"},{"label":"Car Loan (Van) US Bank","val":468.0,"cat":"transport"},{"label":"Extra Spending","val":1198.0,"cat":"everyday"}],"subs":[{"label":"Netflix","val":22.0,"cat":"subs"},{"label":"Dropbox","val":13.0,"cat":"subs"},{"label":"VidAngel","val":10.0,"cat":"subs"},{"label":"Arlo","val":6.0,"cat":"subs"},{"label":"Apple Music + Storage","val":20.0,"cat":"subs"},{"label":"Microsoft (365 + xBox)","val":8.0,"cat":"subs"},{"label":"Disney+","val":17.0,"cat":"subs"},{"label":"Dashlane","val":4.0,"cat":"subs"},{"label":"Quick Quack Car Wash","val":40.0,"cat":"transport"},{"label":"Google Cloud","val":2.0,"cat":"subs"}],"payPeriods":26}};
+
 let state = JSON.parse(JSON.stringify(defaultState));
 const STORE_KEY = 'jordan-budget-2026-v1';
+const SHEETS_INDEX_KEY = 'budget-sheets-index';
+let sheetsIndex = [];
+let currentSheetId = null;
+let EDITABLE = true;
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
 const commas = n => Math.round(n || 0).toLocaleString('en-US');
 let saveTimer = null;
@@ -354,10 +409,11 @@ function renderRows(container, items, group, withCat){
     row.dataset.dragGroup = group;
     row.dataset.dragIdx = idx;
     const catDot = withCat ? `<i class="catdot" data-action="cycle-cat" data-group="${group}" data-idx="${idx}" style="background:${CAT[item.cat].color}" title="Click to change category"></i>` : '';
+    const dis = EDITABLE ? '' : 'disabled';
     row.innerHTML = `
-      <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label"></span>
+      <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label" ${dis}></span>
       <span class="amt-wrap"><span class="cur">$</span>
-        <input type="text" inputmode="decimal" class="amt-input" value="${commas(item.val)}" data-group="${group}" data-idx="${idx}" data-field="val"></span>
+        <input type="text" inputmode="decimal" class="amt-input" value="${commas(item.val)}" data-group="${group}" data-idx="${idx}" data-field="val" ${dis}></span>
       <button class="row-remove" data-action="remove" data-group="${group}" data-idx="${idx}" aria-label="Remove ${item.label}"></button>`;
     container.appendChild(row);
   });
@@ -404,7 +460,7 @@ function render(){
 
   const p1c = document.getElementById('p1Rows');
   renderRows(p1c, state.p1, 'p1', true);
-  p1c.appendChild(renderSubsLinkRow());
+  if(state.subs.length > 0) p1c.appendChild(renderSubsLinkRow());
   const p1TotalRow = document.createElement('div');
   p1TotalRow.className = 'row total';
   p1TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
@@ -428,6 +484,7 @@ function render(){
   subsc.appendChild(addBtn('subs', 'Add subscription'));
 
   document.getElementById('payPeriods').value = state.payPeriods;
+  document.getElementById('payPeriods').disabled = !EDITABLE;
   recalcTotals();
 }
 
@@ -435,7 +492,7 @@ function recalcTotals(){
   const p1t = p1Total();
   const p2t = p2Total();
   const subT = subsTotal();
-  const netPaycheckItem = state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)');
+  const netPaycheckItem = state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)') || state.income.find(i => i.kind === 'netPaycheck');
   const netPaycheck = netPaycheckItem ? netPaycheckItem.val : 0;
 
   const lockedInput = document.querySelector('#p1Rows input.locked');
@@ -461,15 +518,23 @@ function recalcTotals(){
 
   const salaryItem = state.income.find(i => i.label.trim() === 'Gross Annual Salary');
   const salary = salaryItem ? salaryItem.val : 0;
-  const bonus = Math.round(salary * 0.2);
-  const bonusItem = state.income.find(i => i.locked);
-  if(bonusItem) bonusItem.val = bonus;
-  const bonusInput = document.querySelector('#incomeRows input.locked');
-  if(bonusInput) bonusInput.value = commas(bonus);
-  const idcItem = state.income.find(i => i.label.trim() === 'IDC Income / year');
+  const lockedBonusItem = state.income.find(i => i.locked);
+  let bonus;
+  if(lockedBonusItem){
+    bonus = Math.round(salary * 0.2);
+    lockedBonusItem.val = bonus;
+    const bonusInput = document.querySelector('#incomeRows input.locked');
+    if(bonusInput) bonusInput.value = commas(bonus);
+  } else {
+    const bonusItem = state.income.find(i => i.kind === 'bonus');
+    bonus = bonusItem ? bonusItem.val : 0;
+  }
+  const idcItem = state.income.find(i => i.label.trim() === 'IDC Income / year') || state.income.find(i => i.kind === 'idc');
   const idc = idcItem ? idcItem.val : 0;
+  const byuItem = state.income.find(i => i.kind === 'byu');
+  const byu = byuItem ? byuItem.val : 0;
   const annualNet = netPaycheck * state.payPeriods;
-  const grossTotal = salary + bonus + idc;
+  const grossTotal = salary + bonus + idc + byu;
   const netOther = 0.65*bonus + 0.65*idc;
   const netTotal = annualNet + netOther;
   const totalExpense = (p1t + p2t) * (state.payPeriods/2);
@@ -642,18 +707,159 @@ function queueSave(){
   }, 500);
 }
 
+function sheetStorageKey(id){
+  return id === '2026' ? STORE_KEY : ('budget-sheet-' + id);
+}
+
+async function loadSheetsIndex(){
+  try{
+    const result = await window.storage.get(SHEETS_INDEX_KEY, true);
+    return JSON.parse(result.value);
+  }catch(err){
+    return null;
+  }
+}
+
+async function saveSheetsIndex(){
+  await window.storage.set(SHEETS_INDEX_KEY, JSON.stringify(sheetsIndex), true);
+}
+
+async function seedHistoricalSheets(){
+  sheetsIndex = [{id:'2026', name:'2026', year:2026, editable:true, createdAt: Date.now()}];
+  for(const yearStr of Object.keys(HISTORICAL_DATA).sort()){
+    sheetsIndex.push({id: yearStr, name: yearStr, year: parseInt(yearStr, 10), editable:false, createdAt: Date.now()});
+    await window.storage.set(sheetStorageKey(yearStr), JSON.stringify(HISTORICAL_DATA[yearStr]), true);
+  }
+  sheetsIndex.sort((a,b)=> (a.year||0) - (b.year||0));
+  await saveSheetsIndex();
+}
+
+function renderPills(){
+  const bar = document.getElementById('pillsBar');
+  bar.innerHTML = '';
+  sheetsIndex.forEach(sheet=>{
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'pill' + (sheet.id === currentSheetId ? ' active' : '');
+    pill.addEventListener('click', ()=> loadSheet(sheet.id));
+    const label = document.createElement('span');
+    label.textContent = sheet.name;
+    pill.appendChild(label);
+    if(sheetsIndex.length > 1){
+      const x = document.createElement('span');
+      x.className = 'pill-x';
+      x.textContent = '×';
+      x.title = 'Delete';
+      x.addEventListener('click', (e)=>{ e.stopPropagation(); deleteSheet(sheet.id); });
+      pill.appendChild(x);
+    }
+    bar.appendChild(pill);
+  });
+  const addPill = document.createElement('button');
+  addPill.type = 'button';
+  addPill.className = 'pill pill-add';
+  addPill.textContent = '+';
+  addPill.title = 'Add year';
+  addPill.addEventListener('click', openAddSheetForm);
+  bar.appendChild(addPill);
+}
+
+async function deleteSheet(id){
+  if(sheetsIndex.length <= 1) return;
+  const sheet = sheetsIndex.find(s=>s.id===id);
+  if(!sheet) return;
+  if(!confirm(`Delete "${sheet.name}"? This can't be undone.`)) return;
+  sheetsIndex = sheetsIndex.filter(s=>s.id!==id);
+  if(id !== '2026'){
+    try{ await window.storage.delete(sheetStorageKey(id), true); }catch(err){}
+  }
+  if(!sheetsIndex.some(s=>s.editable)){
+    sheetsIndex[sheetsIndex.length-1].editable = true;
+  }
+  await saveSheetsIndex();
+  const nextId = currentSheetId === id ? sheetsIndex[sheetsIndex.length-1].id : currentSheetId;
+  await loadSheet(nextId);
+}
+
+function openAddSheetForm(){
+  const panel = document.getElementById('addSheetPanel');
+  const nameInput = document.getElementById('newSheetName');
+  const maxYear = Math.max(0, ...sheetsIndex.map(s=>s.year || 0));
+  nameInput.value = String(maxYear + 1);
+  const copySel = document.getElementById('newSheetCopyFrom');
+  copySel.innerHTML = '<option value="">Start blank</option>' +
+    sheetsIndex.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  panel.style.display = 'flex';
+  nameInput.focus();
+  nameInput.select();
+}
+
+async function loadSheet(id){
+  currentSheetId = id;
+  const meta = sheetsIndex.find(s => s.id === id);
+  EDITABLE = !!(meta && meta.editable);
+  try{
+    const result = await window.storage.get(sheetStorageKey(id), true);
+    const loaded = JSON.parse(result.value);
+    state = id === '2026' ? Object.assign(JSON.parse(JSON.stringify(defaultState)), loaded) : loaded;
+  }catch(err){
+    state = id === '2026' ? JSON.parse(JSON.stringify(defaultState)) : {income:[], p1:[], p2:[], subs:[], payPeriods:26};
+  }
+  document.body.classList.toggle('readonly-view', !EDITABLE);
+  document.getElementById('saveFlag').textContent = EDITABLE ? '● synced' : '🔒 read only';
+  const eyebrow = document.querySelector('.eyebrow');
+  if(eyebrow && meta) eyebrow.textContent = 'Household ledger · ' + meta.name;
+  const sub = document.querySelector('.sub');
+  if(sub) sub.textContent = EDITABLE
+    ? 'Shared with everyone who has this page — edit any number, it saves automatically.'
+    : 'Historical record — read only.';
+  renderPills();
+  render();
+}
+
 async function init(){
   attachHandlers();
-  try{
-    const result = await window.storage.get(STORE_KEY, true);
-    if(result && result.value){
-      const loaded = JSON.parse(result.value);
-      state = Object.assign(JSON.parse(JSON.stringify(defaultState)), loaded);
+
+  document.getElementById('newSheetCancel').addEventListener('click', ()=>{
+    document.getElementById('addSheetPanel').style.display = 'none';
+  });
+
+  document.getElementById('newSheetCreate').addEventListener('click', async ()=>{
+    const name = document.getElementById('newSheetName').value.trim() || String(new Date().getFullYear());
+    const copyFromId = document.getElementById('newSheetCopyFrom').value;
+    const id = 'sheet-' + Date.now();
+    let newState;
+    if(copyFromId){
+      try{
+        const result = await window.storage.get(sheetStorageKey(copyFromId), true);
+        newState = JSON.parse(result.value);
+      }catch(err){
+        newState = {income:[], p1:[], p2:[], subs:[], payPeriods:26};
+      }
+    }else{
+      newState = {income:[], p1:[], p2:[], subs:[], payPeriods:26};
     }
-  }catch(err){
-    // no saved data yet
+    sheetsIndex.forEach(s=> s.editable = false);
+    const yearNum = parseInt(name, 10);
+    const maxYear = Math.max(0, ...sheetsIndex.map(s=>s.year || 0));
+    sheetsIndex.push({
+      id, name,
+      year: isNaN(yearNum) ? maxYear + 1 : yearNum,
+      editable: true,
+      createdAt: Date.now(),
+    });
+    sheetsIndex.sort((a,b)=> (a.year||0) - (b.year||0));
+    await window.storage.set(sheetStorageKey(id), JSON.stringify(newState), true);
+    await saveSheetsIndex();
+    document.getElementById('addSheetPanel').style.display = 'none';
+    await loadSheet(id);
+  });
+
+  sheetsIndex = await loadSheetsIndex();
+  if(!sheetsIndex){
+    await seedHistoricalSheets();
   }
-  render();
+  await loadSheet('2026');
 }
 
 init();
