@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jordan Budget — 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F4F9;
+    --card:#FFFFFF;
+    --ink:#171A2B;
+    --ink-soft:#6D7086;
+    --line:#E7E8F2;
+    --primary:#4F46E5;
+    --primary-deep:#3C34C4;
+    --primary-tint:#EDECFD;
+    --field-bg:#F4F4FC;
+    --field-border:#DEDFF3;
+    --field-border-hover:#C3C5EE;
+    --amber:#F59E0B;
+    --sky:#0EA5E9;
+    --violet:#8B5CF6;
+    --rose:#F43F5E;
+    --green:#22C55E;
+    --good:#15A362;
+    --warn:#E11D48;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:2.5rem 1.5rem 5rem;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;gap:1rem;flex-wrap:wrap;}
+  .eyebrow{font-family:'Sora',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 .4rem;}
+  h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(28px,4vw,38px);margin:0;color:var(--ink);letter-spacing:-.02em;}
+  .sub{color:var(--ink-soft);font-size:14px;margin-top:.4rem;}
+  .actions{display:flex;gap:.6rem;align-items:center;}
+  button{
+    font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;
+    border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    padding:.65rem 1.1rem;border-radius:999px;cursor:pointer;
+    display:flex;align-items:center;gap:.4rem;transition:all .15s;
+  }
+  button.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  button:hover{border-color:var(--field-border-hover);background:var(--primary-tint);}
+  button.primary:hover{background:var(--primary-deep);border-color:var(--primary-deep);}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:calc(.45rem + 6px) .6rem .45rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;}
+  .stat .label{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:0;font-weight:500;white-space:nowrap;line-height:1.2;}
+  .stat .value{font-family:'Inter',sans-serif;font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.01em;line-height:1.15;}
+  .stat.warn .value{color:var(--warn);}
+  .stat.good .value{color:var(--good);}
+
+  .legend{display:flex;flex-wrap:wrap;gap:.9rem;margin:0 0 1.75rem;font-size:12.5px;color:var(--ink-soft);font-weight:500;}
+  .legend span{display:inline-flex;align-items:center;gap:.4rem;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem;}
+  @media (max-width:820px){.stats{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:720px){.grid{grid-template-columns:1fr;}}
+  @media (max-width:480px){.stats{grid-template-columns:1fr;}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:1.3rem 1.4rem 1.1rem;}
+  .card-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.9rem;}
+  .card-head h2{font-family:'Sora',sans-serif;font-size:16px;font-weight:600;margin:0;color:var(--ink);}
+  .card-head .total{font-family:'Inter',sans-serif;font-size:15px;font-weight:600;color:var(--primary);}
+
+  .flow{display:flex;height:10px;border-radius:6px;overflow:hidden;margin-bottom:1rem;background:var(--line);}
+  .flow div{height:100%;}
+
+  .row{display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--line);gap:.5rem;}
+  .row:last-of-type{border-bottom:none;}
+  .row .name{font-size:13.5px;color:var(--ink);flex:1;display:flex;align-items:center;min-width:0;}
+  .row .catdot{width:9px;height:9px;border-radius:50%;margin-right:.55rem;flex-shrink:0;cursor:pointer;transition:transform .12s;}
+  .row .catdot:hover{transform:scale(1.35);}
+  .drag-handle{cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;user-select:none;touch-action:none;}
+  .drag-handle:hover{color:var(--primary);}
+  .row[data-drag-group]{transition:background .1s;}
+  .row.dragging{opacity:.35;}
+  .row.drag-over{box-shadow:inset 0 2px 0 var(--primary);}
+  .amt-wrap{display:flex;align-items:center;font-family:'Inter',sans-serif;font-size:13.5px;}
+  .amt-wrap .cur{color:var(--ink-soft);margin-right:3px;}
+  input[type=number],input[type=text]{
+    border:1.5px solid var(--field-border);background:var(--field-bg);
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:var(--ink);
+    padding:.4rem .6rem;border-radius:9px;cursor:text;transition:all .12s;
+  }
+  input[type=number]{width:92px;text-align:right;}
+  input[type=text].name-input{
+    width:100%;text-align:left;font-family:'Inter',sans-serif;font-weight:400;font-size:13.5px;
+    min-width:0;
+  }
+  input[type=number]:hover,input[type=text]:hover{border-color:var(--field-border-hover);background:#EFEFFC;}
+  input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px var(--primary-tint);}
+  input[type=number].locked{color:var(--ink-soft);background:var(--bg);border-color:var(--line);pointer-events:none;}
+  .locked-tag{font-size:9.5px;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:.4rem;text-transform:uppercase;letter-spacing:.04em;font-weight:500;vertical-align:middle;}
+  input[type=number]::-webkit-inner-spin-button{opacity:0;}
+  #payPeriods{text-align:center;width:64px;}
+
+  .row.total{font-weight:600;padding-top:.65rem;margin-top:.25rem;border-top:2px solid var(--ink);border-bottom:none;}
+  .row.total .name{color:var(--ink);font-weight:600;}
+  .row.total .amt-wrap{font-weight:600;color:var(--primary);}
+
+  .row-remove{
+    position:relative;width:22px;height:22px;min-width:22px;padding:0;border-radius:50%;border:1.5px solid transparent;
+    background:transparent;
+  }
+  .row-remove::before,.row-remove::after{
+    content:'';position:absolute;top:50%;left:50%;width:10px;height:1.5px;background:var(--ink-soft);
+    transform-origin:center;
+  }
+  .row-remove::before{transform:translate(-50%,-50%) rotate(45deg);}
+  .row-remove::after{transform:translate(-50%,-50%) rotate(-45deg);}
+  .row-remove:hover{background:#FDECEC;border-color:#F6C9C9;}
+  .row-remove:hover::before,.row-remove:hover::after{background:var(--warn);}
+  .add-btn{
+    width:100%;justify-content:center;margin-top:.6rem;border:1.5px dashed var(--field-border-hover);
+    background:transparent;color:var(--primary);font-size:13px;padding:.55rem;border-radius:10px;
+  }
+  .add-btn:hover{background:var(--primary-tint);border-color:var(--primary);}
+
+  details{margin-bottom:1.5rem;}
+  summary{
+    cursor:pointer;list-style:none;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:1rem 1.3rem;display:flex;justify-content:space-between;align-items:center;
+  }
+  summary::-webkit-details-marker{display:none;}
+  summary h2{font-family:'Sora',sans-serif;font-size:16px;font-weight:600;margin:0;color:var(--ink);}
+  .chev{
+    position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;
+    border:1.5px solid var(--field-border);transition:all .12s;
+  }
+  .chev::before,.chev::after{
+    content:'';position:absolute;top:50%;left:50%;background:var(--ink-soft);transform:translate(-50%,-50%);transition:transform .15s;
+  }
+  .chev::before{width:10px;height:1.5px;}
+  .chev::after{width:1.5px;height:10px;}
+  details[open] .chev::after{transform:translate(-50%,-50%) rotate(90deg);opacity:0;}
+  summary:hover .chev{border-color:var(--primary);}
+  summary:hover .chev::before,summary:hover .chev::after{background:var(--primary);}
+  .sub-body{border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:.3rem 1.3rem 1rem;margin-top:-1px;}
+
+  .annual{background:var(--primary);color:#fff;border-radius:var(--radius);padding:1.4rem 1.5rem;}
+  .annual h2{font-family:'Sora',sans-serif;font-weight:600;font-size:17px;margin:0 0 1rem;}
+  .arow{display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.18);font-size:13.5px;}
+  .arow:last-child{border-bottom:none;padding-top:.7rem;font-weight:600;font-size:15px;}
+  .arow .amt-wrap{font-family:'Inter',sans-serif;color:#fff;}
+  .arow input[type=number]{color:#fff;width:60px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);}
+  .arow input[type=number]:hover{border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.18);}
+  .arow input[type=number]:focus{background:rgba(255,255,255,.22);border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.2);}
+
+  .foot-note{font-size:12px;color:var(--ink-soft);margin-top:1.5rem;text-align:center;}
+  .save-flag{font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:.3rem;}
+
+  @media print{
+    body{background:#fff;}
+    .actions,.foot-note,.save-flag,.row-remove,.add-btn,details:not([open]) .sub-body{display:none;}
+    .card,.annual,.stat,summary{border:1px solid #999 !important;box-shadow:none !important;}
+    .wrap{padding:0;max-width:100%;}
+    input[type=number],input[type=text]{border:none !important;background:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <p class="eyebrow">Household ledger · 2026</p>
+      <h1>Jordan budget</h1>
+      <p class="sub">Shared with everyone who has this page — edit any number, it saves automatically.</p>
+    </div>
+    <div class="actions">
+      <span class="save-flag" id="saveFlag"><i>●</i> synced</span>
+      <button class="primary" onclick="window.print()">Print</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><p class="label">Total annual gross income</p><p class="value" id="statGross">$0</p></div>
+    <div class="stat"><p class="label">Total annual net income</p><p class="value" id="statNet">$0</p></div>
+    <div class="stat"><p class="label">Total annual expenses</p><p class="value" id="statExpense">$0</p></div>
+    <div class="stat" id="statSurplusCard"><p class="label">Annual surplus</p><p class="value" id="statSurplus">$0</p></div>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#F59E0B"></i>Charitable donations</span>
+    <span><i class="dot" style="background:#0EA5E9"></i>Housing &amp; bills</span>
+    <span><i class="dot" style="background:#8B5CF6"></i>Transportation</span>
+    <span><i class="dot" style="background:#F43F5E"></i>Subscriptions</span>
+    <span><i class="dot" style="background:#22C55E"></i>Everyday</span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-head"><h2>Payment summary</h2></div>
+    <div id="incomeRows"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-head"><h2>1st payment</h2><span class="total" id="p1TotalTop"></span></div>
+      <div class="flow" id="p1Flow"></div>
+      <div id="p1Rows"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>2nd payment</h2><span class="total" id="p2TotalTop"></span></div>
+      <div class="flow" id="p2Flow"></div>
+      <div id="p2Rows"></div>
+    </div>
+  </div>
+
+  <details style="margin-bottom:16px;">
+    <summary><h2>Subscriptions detail</h2><i class="chev" aria-hidden="true"></i></summary>
+    <div class="sub-body" id="subsRows"></div>
+  </details>
+
+  <div class="annual">
+    <h2>Annual summary</h2>
+    <div class="arow"><span>Pay periods per year (biweekly)</span><span class="amt-wrap"><input type="number" id="payPeriods" step="1"></span></div>
+    <div class="arow"><span>Annual net income (paychecks)</span><span class="amt-wrap" id="annualNet"></span></div>
+    <div class="arow"><span>60% of Adobe Bonus + IDC income</span><span class="amt-wrap" id="annualOther"></span></div>
+    <div class="arow"><span>Total annual net income</span><span class="amt-wrap" id="annualNetTotal"></span></div>
+    <div class="arow"><span>Total annual budgeted expenses</span><span class="amt-wrap" id="annualExpense"></span></div>
+    <div class="arow"><span>Annual surplus / (shortfall)</span><span class="amt-wrap" id="annualSurplus"></span></div>
+  </div>
+
+  <p class="foot-note">One extra paycheck lands in 2026, which is why the 1st-payment amount runs lower in some months.</p>
+
+</div>
+
+<script>
+window.storage = {
+  async get(key, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key));
+    if(res.status === 404) throw new Error('not found');
+    if(!res.ok) throw new Error('storage error: ' + res.status);
+    const data = await res.json();
+    return {key, value: data.value, shared: !!shared};
+  },
+  async set(key, value, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key), {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value})
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    return {key, value: data.value, shared: !!shared};
+  },
+  async delete(key, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key), {method: 'DELETE'});
+    if(!res.ok) return null;
+    return {key, deleted: true, shared: !!shared};
+  },
+  async list(prefix, shared){
+    return {keys: [], prefix, shared: !!shared};
+  }
+};
+
+const CAT = {
+  giving:{color:'#F59E0B'}, housing:{color:'#0EA5E9'}, transport:{color:'#8B5CF6'},
+  subs:{color:'#F43F5E'}, everyday:{color:'#22C55E'}
+};
+
+const defaultState = {
+  payPeriods: 26,
+  income: [
+    {label:'Gross Annual Salary', val:198720},
+    {label:'Gross Paycheck (every 2 weeks)', val:7489},
+    {label:'Net Paycheck (every 2 weeks)', val:5033},
+    {label:'Stock Contribution / Paycheck', val:147},
+    {label:'401(k) Contribution / Paycheck', val:294},
+    {label:'Adobe Annual Bonus (20%)', val:39744, locked:true},
+    {label:'IDC Income / year', val:15000},
+    {label:'BYU Income / year', val:600},
+  ],
+  p1: [
+    {label:'Tithing (Adobe)', val:749, cat:'giving'},
+    {label:'Tithing (IDC)', val:100, cat:'giving'},
+    {label:'Fast Offerings', val:100, cat:'giving'},
+    {label:'State Farm Car Insurance', val:697, cat:'transport'},
+    {label:'Questar Gas Bill', val:116, cat:'housing'},
+    {label:'City Bill', val:125, cat:'housing'},
+    {label:'Rocky Mountain Electric Bill', val:171, cat:'housing'},
+    {label:'Internet Bill', val:90, cat:'housing'},
+    {label:'Gas (car)', val:125, cat:'transport'},
+    {label:'Hulu', val:96, cat:'subs'},
+    {label:'Groceries', val:800, cat:'everyday'},
+    {label:'HOA', val:64, cat:'housing'},
+    {label:'Tesla (pay on mobile app)', val:611, cat:'transport'},
+    {label:'Car Loan (Corolla) — America First', val:0, cat:'transport'},
+    {label:'Car Loan (Altima) — America First', val:0, cat:'transport'},
+    {label:'Car Loan (Kia) — Carmax Finance', val:0, cat:'transport'},
+    {label:'Extra Spending', val:1010, cat:'everyday'},
+  ],
+  p2: [
+    {label:'Tithing (Adobe)', val:705, cat:'giving'},
+    {label:'Tithing (IDC)', val:100, cat:'giving'},
+    {label:'Mortgage (Mr. Cooper)', val:2273, cat:'housing'},
+    {label:'T-Mobile Bill', val:108, cat:'housing'},
+    {label:'Car Loan (Van) — US Bank', val:468, cat:'transport'},
+    {label:'Extra Spending', val:1379, cat:'everyday'},
+  ],
+  subs: [
+    {label:'Netflix', val:27},
+    {label:'Dropbox', val:13},
+    {label:'VidAngel', val:10},
+    {label:'Arlo', val:22},
+    {label:'Apple Music + Storage', val:30},
+    {label:'Microsoft (365 + Xbox)', val:10},
+    {label:'Dashlane', val:4},
+    {label:'Quick Quack Car Wash', val:60},
+    {label:'Google Cloud', val:3},
+  ]
+};
+
+let state = JSON.parse(JSON.stringify(defaultState));
+const STORE_KEY = 'jordan-budget-2026-v1';
+const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+let saveTimer = null;
+const CAT_ORDER = ['giving','housing','transport','subs','everyday'];
+
+function subsTotal(){ return state.subs.reduce((s,i)=>s+i.val,0); }
+function p1Total(){ return state.p1.reduce((s,i)=>s+i.val,0) + subsTotal(); }
+function p2Total(){ return state.p2.reduce((s,i)=>s+i.val,0); }
+
+function renderRows(container, items, group, withCat){
+  container.innerHTML = '';
+  items.forEach((item, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    if(item.locked){
+      row.innerHTML = `
+        <span class="name">${item.label} <span class="locked-tag">auto</span></span>
+        <span class="amt-wrap"><span class="cur">$</span>
+          <input type="number" class="locked" value="${item.val}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
+        <span style="width:22px;"></span>`;
+      container.appendChild(row);
+      return;
+    }
+    row.dataset.dragGroup = group;
+    row.dataset.dragIdx = idx;
+    const catDot = withCat ? `<i class="catdot" data-action="cycle-cat" data-group="${group}" data-idx="${idx}" style="background:${CAT[item.cat].color}" title="Click to change category"></i>` : '';
+    row.innerHTML = `
+      <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label"></span>
+      <span class="amt-wrap"><span class="cur">$</span>
+        <input type="number" value="${item.val}" data-group="${group}" data-idx="${idx}" data-field="val"></span>
+      <button class="row-remove" data-action="remove" data-group="${group}" data-idx="${idx}" aria-label="Remove ${item.label}"></button>`;
+    container.appendChild(row);
+  });
+}
+
+function renderSubsLinkRow(){
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
+    <span class="amt-wrap"><span class="cur">$</span>
+      <input type="number" class="locked" value="${subsTotal()}" tabindex="-1">
+    </span>
+    <span style="width:22px;"></span>`;
+  return row;
+}
+
+function renderFlow(container, items, total){
+  container.innerHTML = '';
+  const buckets = {};
+  items.forEach(i=>{ buckets[i.cat] = (buckets[i.cat]||0) + i.val; });
+  Object.keys(buckets).forEach(cat=>{
+    const seg = document.createElement('div');
+    const pct = total > 0 ? (buckets[cat]/total*100) : 0;
+    seg.style.width = pct + '%';
+    seg.style.background = CAT[cat].color;
+    container.appendChild(seg);
+  });
+}
+
+function addBtn(group, label){
+  const b = document.createElement('button');
+  b.className = 'add-btn';
+  b.dataset.action = 'add';
+  b.dataset.group = group;
+  b.textContent = '+ ' + label;
+  return b;
+}
+
+function render(){
+  const incomeContainer = document.getElementById('incomeRows');
+  renderRows(incomeContainer, state.income, 'income', false);
+  incomeContainer.appendChild(addBtn('income', 'Add income line'));
+
+  const p1c = document.getElementById('p1Rows');
+  renderRows(p1c, state.p1, 'p1', true);
+  p1c.appendChild(renderSubsLinkRow());
+  const p1TotalRow = document.createElement('div');
+  p1TotalRow.className = 'row total';
+  p1TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  p1c.appendChild(p1TotalRow);
+  p1c.appendChild(addBtn('p1', 'Add item'));
+
+  const p2c = document.getElementById('p2Rows');
+  renderRows(p2c, state.p2, 'p2', true);
+  const p2TotalRow = document.createElement('div');
+  p2TotalRow.className = 'row total';
+  p2TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  p2c.appendChild(p2TotalRow);
+  p2c.appendChild(addBtn('p2', 'Add item'));
+
+  const subsc = document.getElementById('subsRows');
+  renderRows(subsc, state.subs, 'subs', false);
+  const subsTotalRow = document.createElement('div');
+  subsTotalRow.className = 'row total';
+  subsTotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span><span style="width:22px;"></span>`;
+  subsc.appendChild(subsTotalRow);
+  subsc.appendChild(addBtn('subs', 'Add subscription'));
+
+  document.getElementById('payPeriods').value = state.payPeriods;
+  recalcTotals();
+}
+
+function recalcTotals(){
+  const p1t = p1Total();
+  const p2t = p2Total();
+  const subT = subsTotal();
+
+  const lockedInput = document.querySelector('#p1Rows input.locked');
+  if(lockedInput) lockedInput.value = subT;
+
+  document.querySelector('#p1Rows .row.total .amt-wrap').textContent = fmt(p1t);
+  document.getElementById('p1TotalTop').textContent = fmt(p1t);
+  document.querySelector('#p2Rows .row.total .amt-wrap').textContent = fmt(p2t);
+  document.getElementById('p2TotalTop').textContent = fmt(p2t);
+  document.querySelector('#subsRows .row.total .amt-wrap').textContent = fmt(subT);
+
+  renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
+  renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
+
+  const salary = state.income[0] ? state.income[0].val : 0;
+  const netPaycheck = state.income[2] ? state.income[2].val : 0;
+  const bonus = Math.round(salary * 0.2);
+  if(state.income[5]) state.income[5].val = bonus;
+  const bonusInput = document.querySelector('#incomeRows input.locked');
+  if(bonusInput) bonusInput.value = bonus;
+  const idc = state.income[6] ? state.income[6].val : 0;
+  const annualNet = netPaycheck * state.payPeriods;
+  const grossTotal = salary + bonus + idc;
+  const netOther = 0.6*bonus + 0.6*idc;
+  const netTotal = annualNet + netOther;
+  const totalExpense = (p1t + p2t) * (state.payPeriods/2);
+  const surplus = netTotal - totalExpense;
+
+  document.getElementById('annualNet').textContent = fmt(annualNet);
+  document.getElementById('annualOther').textContent = fmt(netOther);
+  document.getElementById('annualNetTotal').textContent = fmt(netTotal);
+  document.getElementById('annualExpense').textContent = fmt(totalExpense);
+  document.getElementById('annualSurplus').textContent = fmt(surplus);
+
+  document.getElementById('statGross').textContent = fmt(grossTotal);
+  document.getElementById('statNet').textContent = fmt(netTotal);
+  document.getElementById('statExpense').textContent = fmt(totalExpense);
+  document.getElementById('statSurplus').textContent = fmt(surplus);
+  const surplusCard = document.getElementById('statSurplusCard');
+  surplusCard.classList.remove('good','warn');
+  surplusCard.classList.add(surplus >= 0 ? 'good' : 'warn');
+}
+
+function groupArray(group){
+  if(group === 'income') return state.income;
+  if(group === 'p1') return state.p1;
+  if(group === 'p2') return state.p2;
+  if(group === 'subs') return state.subs;
+  return null;
+}
+
+function attachHandlers(){
+  document.body.addEventListener('input', e=>{
+    const t = e.target;
+    if(t.tagName !== 'INPUT') return;
+    if(t.id === 'payPeriods'){
+      state.payPeriods = t.valueAsNumber || 0;
+      recalcTotals();
+      queueSave();
+      return;
+    }
+    const group = t.dataset.group;
+    const idx = t.dataset.idx;
+    const field = t.dataset.field;
+    if(group === undefined || idx === undefined) return;
+    const arr = groupArray(group);
+    if(!arr || !arr[idx] || arr[idx].locked) return;
+    if(field === 'label'){
+      arr[idx].label = t.value;
+      queueSave();
+      return;
+    }
+    arr[idx].val = t.valueAsNumber || 0;
+    recalcTotals();
+    queueSave();
+  });
+
+  document.body.addEventListener('click', e=>{
+    const t = e.target.closest('[data-action]');
+    if(!t) return;
+    const action = t.dataset.action;
+    const group = t.dataset.group;
+    const arr = groupArray(group);
+    if(!arr) return;
+
+    if(action === 'remove'){
+      const idx = t.dataset.idx;
+      if(arr[idx] && arr[idx].locked) return;
+      arr.splice(idx, 1);
+      render();
+      queueSave();
+    } else if(action === 'add'){
+      if(group === 'p1' || group === 'p2'){
+        arr.push({label:'New item', val:0, cat:'everyday'});
+      } else {
+        arr.push({label:'New item', val:0});
+      }
+      render();
+      queueSave();
+      const inputs = document.querySelectorAll(`input[data-group="${group}"][data-field="label"]`);
+      const last = inputs[inputs.length-1];
+      if(last){ last.focus(); last.select(); }
+    } else if(action === 'cycle-cat'){
+      const idx = t.dataset.idx;
+      const item = arr[idx];
+      const pos = CAT_ORDER.indexOf(item.cat);
+      item.cat = CAT_ORDER[(pos+1) % CAT_ORDER.length];
+      render();
+      queueSave();
+    }
+  });
+
+  let dragState = null;
+
+  document.body.addEventListener('mousedown', e=>{
+    const handle = e.target.closest('[data-drag-handle]');
+    if(!handle) return;
+    const row = handle.closest('.row[data-drag-group]');
+    if(row) row.draggable = true;
+  });
+
+  document.body.addEventListener('dragstart', e=>{
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row){ e.preventDefault(); return; }
+    dragState = {group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10)};
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+    requestAnimationFrame(()=> row.classList.add('dragging'));
+  });
+
+  document.body.addEventListener('dragover', e=>{
+    if(!dragState) return;
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row || row.dataset.dragGroup !== dragState.group) return;
+    e.preventDefault();
+    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    row.classList.add('drag-over');
+  });
+
+  document.body.addEventListener('drop', e=>{
+    if(!dragState) return;
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row || row.dataset.dragGroup !== dragState.group){ dragState = null; return; }
+    e.preventDefault();
+    const toIdx = parseInt(row.dataset.dragIdx, 10);
+    const arr = groupArray(dragState.group);
+    if(arr && toIdx !== dragState.idx){
+      const [moved] = arr.splice(dragState.idx, 1);
+      arr.splice(toIdx, 0, moved);
+      render();
+      queueSave();
+    }
+    dragState = null;
+  });
+
+  document.body.addEventListener('dragend', e=>{
+    const row = e.target.closest('.row[data-drag-group]');
+    if(row){ row.draggable = false; row.classList.remove('dragging'); }
+    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    dragState = null;
+  });
+}
+
+function queueSave(){
+  const flag = document.getElementById('saveFlag');
+  flag.textContent = '● saving…';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      await window.storage.set(STORE_KEY, JSON.stringify(state), true);
+      flag.textContent = '● synced';
+    }catch(err){
+      flag.textContent = '● not saved';
+    }
+  }, 500);
+}
+
+async function init(){
+  attachHandlers();
+  try{
+    const result = await window.storage.get(STORE_KEY, true);
+    if(result && result.value){
+      const loaded = JSON.parse(result.value);
+      state = Object.assign(JSON.parse(JSON.stringify(defaultState)), loaded);
+    }
+  }catch(err){
+    // no saved data yet
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

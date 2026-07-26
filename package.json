@@ -1,0 +1,17 @@
+{
+  "name": "jordan-budget-2026",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jordan household budget app with a small Express + SQLite backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "better-sqlite3": "^11.3.0"
+  }
+}
