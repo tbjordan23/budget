@@ -435,7 +435,8 @@ function recalcTotals(){
   const p1t = p1Total();
   const p2t = p2Total();
   const subT = subsTotal();
-  const netPaycheck = state.income[2] ? state.income[2].val : 0;
+  const netPaycheckItem = state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)');
+  const netPaycheck = netPaycheckItem ? netPaycheckItem.val : 0;
 
   const lockedInput = document.querySelector('#p1Rows input.locked');
   if(lockedInput) lockedInput.value = commas(subT);
@@ -458,12 +459,15 @@ function recalcTotals(){
   renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
   renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
 
-  const salary = state.income[0] ? state.income[0].val : 0;
+  const salaryItem = state.income.find(i => i.label.trim() === 'Gross Annual Salary');
+  const salary = salaryItem ? salaryItem.val : 0;
   const bonus = Math.round(salary * 0.2);
-  if(state.income[5]) state.income[5].val = bonus;
+  const bonusItem = state.income.find(i => i.locked);
+  if(bonusItem) bonusItem.val = bonus;
   const bonusInput = document.querySelector('#incomeRows input.locked');
   if(bonusInput) bonusInput.value = commas(bonus);
-  const idc = state.income[6] ? state.income[6].val : 0;
+  const idcItem = state.income.find(i => i.label.trim() === 'IDC Income / year');
+  const idc = idcItem ? idcItem.val : 0;
   const annualNet = netPaycheck * state.payPeriods;
   const grossTotal = salary + bonus + idc;
   const netOther = 0.6*bonus + 0.6*idc;
