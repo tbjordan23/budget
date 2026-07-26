@@ -52,7 +52,6 @@
 
   .ret-year{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--ink-soft);}
   .ret-note{font-size:11.5px;color:var(--ink-soft);}
-  .ret-subhead{font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;color:var(--ink);margin:1.1rem 0 .3rem;display:flex;align-items:baseline;gap:.5rem;}
   .amt-wrap .cur.pct{margin-left:4px;margin-right:0;}
   .amt-wrap .cur.ret-ghost{visibility:hidden;}
   .ret-deficit .name,.ret-deficit .amt-wrap{color:var(--warn);}
@@ -394,7 +393,7 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="grid" style="margin-bottom:16px;">
       <div class="card">
         <div class="card-head"><h2>Salary &amp; investment accounts</h2></div>
         <div id="retAssumpA"></div>
@@ -403,6 +402,11 @@
         <div class="card-head"><h2>Pension, Social Security &amp; expenses</h2></div>
         <div id="retAssumpB"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Extra cash</h2><span class="ret-note">Not counted toward monthly income</span></div>
+      <div id="retExtraRows"></div>
     </div>
   </div>
 
@@ -1290,7 +1294,7 @@ function renderRetAssumpB(){
   const ages = sel === 'combined' ? RET_AGES : [sel];
   ages.forEach(age=>{
     const tag = sel === 'combined' ? ` (${age})` : '';
-    retStaticRow(b, 'Church Pension' + tag, retState.pension['age'+age+'Monthly'], 'dollar');
+    retInputRow(b, 'Church Pension' + tag, 'pension.age' + age + 'Monthly', 'dollar');
     retStaticRow(b, 'Retirement Year' + tag, retYearForAge(age), 'year');
   });
   if(ages.includes(62)){
@@ -1299,13 +1303,13 @@ function renderRetAssumpB(){
   }
   retInputRow(b, '401(k) withdrawal rate', 'withdrawalRatePct', 'percent');
   retInputRow(b, 'Estimated retirement expenses (monthly)', 'retirementExpensesMonthly', 'dollar');
+}
 
-  const subhead = document.createElement('div');
-  subhead.className = 'ret-subhead';
-  subhead.innerHTML = 'Extra cash <span class="ret-note">Not counted toward monthly income</span>';
-  b.appendChild(subhead);
-  retInputRow(b, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
-  retInputRow(b, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
+function renderRetExtra(){
+  const el = document.getElementById('retExtraRows');
+  el.innerHTML = '';
+  retInputRow(el, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
+  retInputRow(el, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
 }
 
 function renderRetAssumptions(){
@@ -1337,6 +1341,7 @@ function recalcRetirement(){
 function renderRetirement(){
   recalcRetirement();
   renderRetAssumptions();
+  renderRetExtra();
 }
 
 function setRetSaveStatus(kind){
