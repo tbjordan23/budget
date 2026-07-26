@@ -92,6 +92,31 @@ function migrateIdcLabels() {
 }
 migrateIdcLabels();
 
+// One-time, idempotent fix: correct the IDC Annual Income amounts for
+// 2012-2025 to match the household's actual records.
+function migrateIdcAmounts() {
+  const updates = {
+    '2012': 5000, '2013': 7400, '2014': 5600, '2015': 12200,
+    '2016': 16500, '2017': 10500, '2018': 16500, '2019': 19500,
+    '2020': 15500, '2021': 25300, '2022': 26500, '2023': 23000,
+    '2024': 17000, '2025': 15000,
+  };
+  for (const year of Object.keys(updates)) {
+    const key = 'budget-sheet-' + year;
+    const row = db.prepare('SELECT value FROM storage WHERE key = ?').get(key);
+    if (!row) continue;
+    const state = JSON.parse(row.value);
+    const item = state.income && state.income.find(i => i.kind === 'idc');
+    if (!item || item.val === updates[year]) continue;
+    item.val = updates[year];
+    db.prepare(`
+      INSERT INTO storage (key, value, updated_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, JSON.stringify(state));
+  }
+}
+migrateIdcAmounts();
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
