@@ -38,6 +38,18 @@
     -webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:960px;margin:0 auto;padding:2.5rem 1.5rem 5rem;}
+  .topnav{display:flex;gap:.4rem;margin-bottom:1.75rem;border-bottom:1px solid var(--line);padding-bottom:.1rem;}
+  .topnav button{
+    font-family:'Sora',sans-serif;font-size:14px;font-weight:600;
+    border:none;background:transparent;color:var(--ink-soft);cursor:pointer;
+    padding:.7rem 1rem;border-radius:10px 10px 0 0;position:relative;top:1px;
+    border-bottom:2px solid transparent;transition:all .15s;
+  }
+  .topnav button:hover{color:var(--primary);background:var(--primary-tint);}
+  .topnav button.active{color:var(--primary);border-bottom-color:var(--primary);}
+
+  .placeholder-card{color:var(--ink-soft);font-size:14.5px;padding:2.4rem 1.5rem;text-align:center;}
+
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;gap:1rem;flex-wrap:wrap;}
   .eyebrow{font-family:'Sora',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 .4rem;}
   h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(28px,4vw,38px);margin:0;color:var(--ink);letter-spacing:-.02em;}
@@ -209,7 +221,7 @@
 
   @media print{
     body{background:#fff;}
-    .actions,.foot-note,.save-flag,.row-remove,.add-btn,.pills-row,.add-sheet-panel,details:not([open]) .sub-body{display:none;}
+    .actions,.foot-note,.save-flag,.row-remove,.add-btn,.pills-row,.add-sheet-panel,.topnav,details:not([open]) .sub-body{display:none;}
     .card,.annual,.stat,summary{border:1px solid #999 !important;box-shadow:none !important;}
     .wrap{padding:0;max-width:100%;}
     input[type=number],input[type=text]{border:none !important;background:none !important;}
@@ -218,6 +230,14 @@
 </head>
 <body>
 <div class="wrap">
+
+  <nav class="topnav" id="topNav">
+    <button type="button" class="active" data-page="ledger">Budget</button>
+    <button type="button" data-page="retirement">Retirement</button>
+    <button type="button" data-page="investments">Investments</button>
+  </nav>
+
+  <div id="page-ledger">
 
   <div class="topbar">
     <div>
@@ -292,6 +312,42 @@
   </div>
 
   <p class="foot-note" id="extraPaycheckNote">One extra paycheck lands in 2026, which is why the 1st-payment amount runs lower in some months.</p>
+
+  </div>
+
+  <div id="page-retirement" style="display:none;">
+    <div class="topbar">
+      <div>
+        <p class="eyebrow">Retirement Planning</p>
+        <h1>Retirement Planning</h1>
+        <p class="sub">This section is coming soon.</p>
+      </div>
+      <div class="actions">
+        <span class="save-flag"><span class="dot" style="background:var(--good);"></span><span>synced</span></span>
+        <button class="primary" onclick="window.print()">Print</button>
+      </div>
+    </div>
+    <div class="card placeholder-card">
+      <p>Retirement account balances, contributions, and projections will live here.</p>
+    </div>
+  </div>
+
+  <div id="page-investments" style="display:none;">
+    <div class="topbar">
+      <div>
+        <p class="eyebrow">Investments</p>
+        <h1>Investments</h1>
+        <p class="sub">This section is coming soon.</p>
+      </div>
+      <div class="actions">
+        <span class="save-flag"><span class="dot" style="background:var(--good);"></span><span>synced</span></span>
+        <button class="primary" onclick="window.print()">Print</button>
+      </div>
+    </div>
+    <div class="card placeholder-card">
+      <p>Investment accounts and holdings will live here.</p>
+    </div>
+  </div>
 
 </div>
 
@@ -889,8 +945,20 @@ async function loadSheet(id){
   render();
 }
 
+function showPage(page){
+  document.getElementById('page-ledger').style.display = page === 'ledger' ? 'block' : 'none';
+  document.getElementById('page-retirement').style.display = page === 'retirement' ? 'block' : 'none';
+  document.getElementById('page-investments').style.display = page === 'investments' ? 'block' : 'none';
+  document.querySelectorAll('#topNav button').forEach(b=> b.classList.toggle('active', b.dataset.page === page));
+}
+
 async function init(){
   attachHandlers();
+
+  document.getElementById('topNav').addEventListener('click', e=>{
+    const btn = e.target.closest('button[data-page]');
+    if(btn) showPage(btn.dataset.page);
+  });
 
   document.getElementById('newSheetCancel').addEventListener('click', ()=>{
     document.getElementById('addSheetPanel').style.display = 'none';
