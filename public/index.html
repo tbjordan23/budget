@@ -55,8 +55,8 @@
 
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem;}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:calc(.45rem + 6px) .6rem .45rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;}
-  .stat .label{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:0;font-weight:500;white-space:nowrap;line-height:1.2;}
-  .stat .value{font-family:'Inter',sans-serif;font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.01em;line-height:1.15;}
+  .stat .label{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:9px 0 0;font-weight:500;white-space:nowrap;line-height:1.2;}
+  .stat .value{font-family:'Inter',sans-serif;font-size:21px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.15;}
   .stat.warn .value{color:var(--warn);}
   .stat.good .value{color:var(--good);}
 
@@ -160,7 +160,8 @@
   .arow input[type=number]:focus{background:rgba(255,255,255,.22);border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.2);}
 
   .foot-note{font-size:12px;color:var(--ink-soft);margin-top:1.5rem;text-align:center;}
-  .save-flag{font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:.3rem;}
+  .save-flag{font-size:11px;color:var(--ink-soft);display:flex;align-items:center;gap:.4rem;}
+  .save-flag #saveDot{width:11px;height:11px;background:var(--good);flex-shrink:0;}
 
   .pills-row{display:flex;align-items:flex-start;margin-bottom:1.25rem;}
   .pills-bar{display:flex;flex-wrap:wrap;gap:.5rem;}
@@ -217,7 +218,7 @@
       <p class="sub">Shared with everyone who has this page — edit any number, it saves automatically.</p>
     </div>
     <div class="actions">
-      <span class="save-flag" id="saveFlag"><i>●</i> synced</span>
+      <span class="save-flag" id="saveFlag"><span class="dot" id="saveDot"></span><span id="saveText">synced</span></span>
       <button class="primary" onclick="window.print()">Print</button>
     </div>
   </div>
@@ -323,14 +324,14 @@ const CAT = {
 const defaultState = {
   payPeriods: 26,
   income: [
-    {label:'Gross Annual Salary', val:198720},
-    {label:'Gross Paycheck (every 2 weeks)', val:7489},
-    {label:'Net Paycheck (every 2 weeks)', val:5033},
-    {label:'Stock Contribution / Paycheck', val:147},
-    {label:'401(k) Contribution / Paycheck', val:294},
-    {label:'Adobe Annual Bonus (20%)', val:39744, locked:true},
-    {label:'IDC Income / year', val:15000},
-    {label:'BYU Income / year', val:600},
+    {label:'Gross Annual Salary', val:198720, kind:'salary'},
+    {label:'Gross Paycheck (every 2 weeks)', val:7489, kind:'grossPaycheck'},
+    {label:'Net Paycheck (every 2 weeks)', val:5033, kind:'netPaycheck'},
+    {label:'Stock Contribution / Paycheck', val:147, kind:'other'},
+    {label:'401(k) Contribution / Paycheck', val:294, kind:'other'},
+    {label:'Adobe Annual Bonus (20%)', val:39744, locked:true, kind:'bonus'},
+    {label:'IDC Income / year', val:15000, kind:'idc'},
+    {label:'BYU Income / year', val:600, kind:'byu'},
   ],
   p1: [
     {label:'Tithing (Adobe)', val:749, cat:'giving'},
@@ -342,7 +343,6 @@ const defaultState = {
     {label:'Rocky Mountain Electric Bill', val:171, cat:'housing'},
     {label:'Internet Bill', val:90, cat:'housing'},
     {label:'Gas (car)', val:125, cat:'transport'},
-    {label:'Hulu', val:96, cat:'subs'},
     {label:'Groceries', val:800, cat:'everyday'},
     {label:'HOA', val:64, cat:'housing'},
     {label:'Tesla (pay on mobile app)', val:611, cat:'transport'},
@@ -360,6 +360,7 @@ const defaultState = {
     {label:'Extra Spending', val:1379, cat:'everyday'},
   ],
   subs: [
+    {label:'Hulu', val:96},
     {label:'Netflix', val:27},
     {label:'Dropbox', val:13},
     {label:'VidAngel', val:10},
@@ -492,7 +493,7 @@ function recalcTotals(){
   const p1t = p1Total();
   const p2t = p2Total();
   const subT = subsTotal();
-  const netPaycheckItem = state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)') || state.income.find(i => i.kind === 'netPaycheck');
+  const netPaycheckItem = state.income.find(i => i.kind === 'netPaycheck') || state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)');
   const netPaycheck = netPaycheckItem ? netPaycheckItem.val : 0;
 
   const lockedInput = document.querySelector('#p1Rows input.locked');
@@ -516,7 +517,7 @@ function recalcTotals(){
   renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
   renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
 
-  const salaryItem = state.income.find(i => i.label.trim() === 'Gross Annual Salary');
+  const salaryItem = state.income.find(i => i.kind === 'salary') || state.income.find(i => i.label.trim() === 'Gross Annual Salary');
   const salary = salaryItem ? salaryItem.val : 0;
   const lockedBonusItem = state.income.find(i => i.locked);
   let bonus;
@@ -529,9 +530,9 @@ function recalcTotals(){
     const bonusItem = state.income.find(i => i.kind === 'bonus');
     bonus = bonusItem ? bonusItem.val : 0;
   }
-  const idcItem = state.income.find(i => i.label.trim() === 'IDC Income / year') || state.income.find(i => i.kind === 'idc');
+  const idcItem = state.income.find(i => i.kind === 'idc') || state.income.find(i => i.label.trim() === 'IDC Income / year');
   const idc = idcItem ? idcItem.val : 0;
-  const byuItem = state.income.find(i => i.kind === 'byu');
+  const byuItem = state.income.find(i => i.kind === 'byu') || state.income.find(i => i.label.trim() === 'BYU Income / year');
   const byu = byuItem ? byuItem.val : 0;
   const annualNet = netPaycheck * state.payPeriods;
   const grossTotal = salary + bonus + idc + byu;
@@ -693,16 +694,29 @@ function attachHandlers(){
   });
 }
 
+function setSaveStatus(kind){
+  const dot = document.getElementById('saveDot');
+  const text = document.getElementById('saveText');
+  if(kind === 'readonly'){
+    dot.style.display = 'none';
+    text.textContent = '🔒 read only';
+    return;
+  }
+  dot.style.display = '';
+  dot.style.background = kind === 'synced' ? 'var(--good)' : kind === 'error' ? 'var(--warn)' : 'var(--ink-soft)';
+  text.textContent = kind === 'synced' ? 'synced' : kind === 'error' ? 'not saved' : 'saving…';
+}
+
 function queueSave(){
-  const flag = document.getElementById('saveFlag');
-  flag.textContent = '● saving…';
+  setSaveStatus('saving');
   clearTimeout(saveTimer);
+  const key = sheetStorageKey(currentSheetId);
   saveTimer = setTimeout(async ()=>{
     try{
-      await window.storage.set(STORE_KEY, JSON.stringify(state), true);
-      flag.textContent = '● synced';
+      await window.storage.set(key, JSON.stringify(state), true);
+      setSaveStatus('synced');
     }catch(err){
-      flag.textContent = '● not saved';
+      setSaveStatus('error');
     }
   }, 500);
 }
@@ -794,6 +808,26 @@ function openAddSheetForm(){
   nameInput.select();
 }
 
+// Income rows saved before the `kind` tag existed only have a label. Backfill
+// `kind` from the label once on load so it survives future renames — matching
+// is by kind from then on, never by label text.
+const INCOME_KIND_BY_LABEL = {
+  'Gross Annual Salary': 'salary',
+  'Gross Paycheck (every 2 weeks)': 'grossPaycheck',
+  'Net Paycheck (every 2 weeks)': 'netPaycheck',
+  'IDC Income / year': 'idc',
+  'BYU Income / year': 'byu',
+};
+function migrateIncomeKinds(income){
+  if(!Array.isArray(income)) return;
+  income.forEach(item=>{
+    if(item.kind) return;
+    if(item.locked){ item.kind = 'bonus'; return; }
+    const known = INCOME_KIND_BY_LABEL[item.label && item.label.trim()];
+    if(known) item.kind = known;
+  });
+}
+
 async function loadSheet(id){
   currentSheetId = id;
   const meta = sheetsIndex.find(s => s.id === id);
@@ -805,8 +839,9 @@ async function loadSheet(id){
   }catch(err){
     state = id === '2026' ? JSON.parse(JSON.stringify(defaultState)) : {income:[], p1:[], p2:[], subs:[], payPeriods:26};
   }
+  migrateIncomeKinds(state.income);
   document.body.classList.toggle('readonly-view', !EDITABLE);
-  document.getElementById('saveFlag').textContent = EDITABLE ? '● synced' : '🔒 read only';
+  setSaveStatus(EDITABLE ? 'synced' : 'readonly');
   const eyebrow = document.querySelector('.eyebrow');
   if(eyebrow && meta) eyebrow.textContent = 'Household ledger · ' + meta.name;
   const sub = document.querySelector('.sub');
