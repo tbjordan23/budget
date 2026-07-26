@@ -241,8 +241,8 @@
 
   <div class="topbar">
     <div>
-      <p class="eyebrow">Household ledger · 2026</p>
-      <h1>Jordan Finance</h1>
+      <p class="eyebrow">Jordan Finance</p>
+      <h1>Jordan Budget</h1>
       <p class="sub">Shared with everyone who has this page — edit any number, it saves automatically.</p>
     </div>
     <div class="actions">
@@ -318,7 +318,7 @@
   <div id="page-retirement" style="display:none;">
     <div class="topbar">
       <div>
-        <p class="eyebrow">Retirement Planning</p>
+        <p class="eyebrow">Jordan Finance</p>
         <h1>Retirement Planning</h1>
         <p class="sub">This section is coming soon.</p>
       </div>
@@ -335,8 +335,8 @@
   <div id="page-investments" style="display:none;">
     <div class="topbar">
       <div>
-        <p class="eyebrow">Investments</p>
-        <h1>Investments</h1>
+        <p class="eyebrow">Jordan Finance</p>
+        <h1>Financial Investments</h1>
         <p class="sub">This section is coming soon.</p>
       </div>
       <div class="actions">
@@ -933,12 +933,10 @@ async function loadSheet(id){
   migrateIncomeKinds(state.income);
   document.body.classList.toggle('readonly-view', !EDITABLE);
   setSaveStatus(EDITABLE ? 'synced' : 'readonly');
-  const eyebrow = document.querySelector('.eyebrow');
-  if(eyebrow && meta) eyebrow.textContent = 'Household ledger · ' + meta.name;
-  const sub = document.querySelector('.sub');
+  const sub = document.querySelector('#page-ledger .sub');
   if(sub) sub.textContent = EDITABLE
     ? 'Shared with everyone who has this page — edit any number, it saves automatically.'
-    : 'Historical record — read only.';
+    : `Historical record ${meta ? meta.name : ''} — read only.`;
   const extraPaycheckNote = document.getElementById('extraPaycheckNote');
   if(extraPaycheckNote) extraPaycheckNote.style.display = id === '2026' ? '' : 'none';
   renderPills();
