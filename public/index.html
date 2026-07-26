@@ -54,6 +54,12 @@
   .ret-note{font-size:11.5px;color:var(--ink-soft);}
   .amt-wrap .cur.pct{margin-left:4px;margin-right:0;}
   .amt-wrap .cur.ret-ghost{visibility:hidden;}
+  .ret-toggle{display:inline-flex;align-items:center;margin-left:.6rem;cursor:pointer;flex-shrink:0;}
+  .ret-toggle input{display:none;}
+  .ret-toggle-track{width:30px;height:17px;background:var(--field-border);border-radius:999px;position:relative;transition:background .15s;flex-shrink:0;}
+  .ret-toggle-thumb{position:absolute;top:2px;left:2px;width:13px;height:13px;background:#fff;border-radius:50%;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .ret-toggle input:checked + .ret-toggle-track{background:var(--primary);}
+  .ret-toggle input:checked + .ret-toggle-track .ret-toggle-thumb{left:15px;}
   .ret-deficit .name,.ret-deficit .amt-wrap{color:var(--warn);}
   .ret-surplus .amt-wrap{color:var(--good);}
   .grid.ret-single-card{grid-template-columns:1fr;}
@@ -363,7 +369,7 @@
       <button type="button" class="pill" data-age="60">Age 60</button>
       <button type="button" class="pill" data-age="61">Age 61</button>
       <button type="button" class="pill" data-age="62">Age 62</button>
-      <button type="button" class="pill" data-age="combined">Combined</button>
+      <button type="button" class="pill" data-age="combined">Compare</button>
     </div>
 
     <div class="stats" id="retStats"></div>
@@ -393,20 +399,22 @@
       </div>
     </div>
 
-    <div class="grid" style="margin-bottom:16px;">
-      <div class="card">
-        <div class="card-head"><h2>Salary &amp; investment accounts</h2></div>
-        <div id="retAssumpA"></div>
+    <div id="retAssumptionsSection">
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-head"><h2>Salary &amp; investment accounts</h2></div>
+          <div id="retAssumpA"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Pension, Social Security &amp; expenses</h2></div>
+          <div id="retAssumpB"></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-head"><h2>Pension, Social Security &amp; expenses</h2></div>
-        <div id="retAssumpB"></div>
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="card-head"><h2>Extra cash</h2><span class="ret-note">Not counted toward monthly income</span></div>
-      <div id="retExtraRows"></div>
+      <div class="card">
+        <div class="card-head"><h2>Extra cash</h2><span class="ret-note">Not counted toward monthly income</span></div>
+        <div id="retExtraRows"></div>
+      </div>
     </div>
   </div>
 
@@ -1043,7 +1051,7 @@ const defaultRetState = {
   pension: { age59Monthly: 2300, age60Monthly: 2500, age61Monthly: 2650, age62Monthly: 2800, age59Year: 2036, age62Year: 2039 },
   socialSecurityAge62Monthly: 2800,
   withdrawalRatePct: 4,
-  extraCash: { idcMonthly: 3000, adobeStock: 250000 },
+  extraCash: { idcMonthly: 3000, adobeStock: 250000, includeIdcInIncome: false },
   retirementExpensesMonthly: 8000,
   selectedAge: 59,
 };
@@ -1108,9 +1116,10 @@ function computeRetProjection(){
     const investmentMonthly = point.total * (rs.withdrawalRatePct/100) / 12;
     const pensionMonthly = rs.pension['age' + age + 'Monthly'];
     const ssMonthly = age === 62 ? rs.socialSecurityAge62Monthly : 0;
-    const totalMonthly = investmentMonthly + pensionMonthly + ssMonthly;
+    const idcMonthly = rs.extraCash.includeIdcInIncome ? rs.extraCash.idcMonthly : 0;
+    const totalMonthly = investmentMonthly + pensionMonthly + ssMonthly + idcMonthly;
     const deficit = totalMonthly - rs.retirementExpensesMonthly;
-    return {age, year: targetYear, adobeBal: point.adobe, churchBal: point.church, totalBal: point.total, investmentMonthly, pensionMonthly, ssMonthly, totalMonthly, deficit};
+    return {age, year: targetYear, adobeBal: point.adobe, churchBal: point.church, totalBal: point.total, investmentMonthly, pensionMonthly, ssMonthly, idcMonthly, totalMonthly, deficit};
   }
   const scenarios = {};
   RET_AGES.forEach(age => { scenarios[age] = scenario(age); });
@@ -1138,6 +1147,7 @@ function renderRetBreakdown(age, scenario){
     ['Social Security', scenario.ssMonthly],
     ['401(k) income (' + retState.withdrawalRatePct + '%/yr withdrawal)', scenario.investmentMonthly],
   ];
+  if(scenario.idcMonthly > 0) rows.push(['IDC income (included)', scenario.idcMonthly]);
   rows.forEach(([label, val])=>{
     const row = document.createElement('div');
     row.className = 'row';
@@ -1253,24 +1263,28 @@ function renderRetChart(proj){
 }
 
 function retDispVal(val, kind){ return kind === 'dollar' ? commas(val) : val; }
-function retInputRow(container, label, path, kind){
+function retInputRow(container, label, path, kind, toggle){
   const val = retGet(path);
   const row = document.createElement('div');
   row.className = 'row';
   const prefix = kind === 'dollar' ? '<span class="cur">$</span>' : '<span class="cur ret-ghost">$</span>';
   const suffix = kind === 'percent' ? '<span class="cur pct">%</span>' : '<span class="cur pct ret-ghost">%</span>';
   const widthAttr = kind === 'year' ? ' style="width:76px;"' : '';
-  row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${prefix}<input type="text" inputmode="decimal" class="amt-input ret-input" data-path="${path}" data-kind="${kind}" value="${retDispVal(val, kind)}"${widthAttr}>${suffix}</span>`;
+  const toggleHtml = toggle ? `<label class="ret-toggle" title="${toggle.title}">
+      <input type="checkbox" class="ret-toggle-input" data-path="${toggle.path}" ${retGet(toggle.path) ? 'checked' : ''}>
+      <span class="ret-toggle-track"><span class="ret-toggle-thumb"></span></span>
+    </label>` : '';
+  row.innerHTML = `<span class="name">${label}${toggleHtml}</span><span class="amt-wrap">${prefix}<input type="text" inputmode="decimal" class="amt-input ret-input" data-path="${path}" data-kind="${kind}" value="${retDispVal(val, kind)}"${widthAttr}>${suffix}</span>`;
   container.appendChild(row);
 }
 
-function retStaticRow(container, label, value, kind){
+function retLockedRow(container, label, value, kind){
   const row = document.createElement('div');
   row.className = 'row';
-  const display = kind === 'dollar'
-    ? `<span class="cur">$</span><span class="amt-text">${commas(value)}</span>`
-    : `<span class="amt-text">${value}</span>`;
-  row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${display}</span>`;
+  const prefix = kind === 'dollar' ? '<span class="cur">$</span>' : '<span class="cur ret-ghost">$</span>';
+  const suffix = kind === 'percent' ? '<span class="cur pct">%</span>' : '<span class="cur pct ret-ghost">%</span>';
+  const widthAttr = kind === 'year' ? ' style="width:76px;"' : '';
+  row.innerHTML = `<span class="name">${label}</span><span class="amt-wrap">${prefix}<input type="text" class="amt-input locked" value="${retDispVal(value, kind)}" tabindex="-1"${widthAttr}>${suffix}</span>`;
   container.appendChild(row);
 }
 
@@ -1291,15 +1305,11 @@ function renderRetAssumpB(){
   const b = document.getElementById('retAssumpB');
   b.innerHTML = '';
   const sel = retState.selectedAge;
-  const ages = sel === 'combined' ? RET_AGES : [sel];
-  ages.forEach(age=>{
-    const tag = sel === 'combined' ? ` (${age})` : '';
-    retInputRow(b, 'Church Pension' + tag, 'pension.age' + age + 'Monthly', 'dollar');
-    retStaticRow(b, 'Retirement Year' + tag, retYearForAge(age), 'year');
-  });
-  if(ages.includes(62)){
-    const tag = sel === 'combined' ? ' (62)' : '';
-    retInputRow(b, 'Social Security' + tag, 'socialSecurityAge62Monthly', 'dollar');
+  if(sel === 'combined') return;
+  retLockedRow(b, 'Church Pension', retState.pension['age' + sel + 'Monthly'], 'dollar');
+  retLockedRow(b, 'Retirement Year', retYearForAge(sel), 'year');
+  if(sel === 62){
+    retInputRow(b, 'Social Security', 'socialSecurityAge62Monthly', 'dollar');
   }
   retInputRow(b, '401(k) withdrawal rate', 'withdrawalRatePct', 'percent');
   retInputRow(b, 'Estimated retirement expenses (monthly)', 'retirementExpensesMonthly', 'dollar');
@@ -1308,7 +1318,7 @@ function renderRetAssumpB(){
 function renderRetExtra(){
   const el = document.getElementById('retExtraRows');
   el.innerHTML = '';
-  retInputRow(el, 'IDC income in retirement (monthly)', 'extraCash.idcMonthly', 'dollar');
+  retInputRow(el, 'IDC Income (monthly)', 'extraCash.idcMonthly', 'dollar', {path: 'extraCash.includeIdcInIncome', title: 'Include in monthly income projections'});
   retInputRow(el, 'Adobe stock (est. value)', 'extraCash.adobeStock', 'dollar');
 }
 
@@ -1338,10 +1348,15 @@ function recalcRetirement(){
   renderRetAgePills();
 }
 
+function updateRetAssumptionsVisibility(){
+  document.getElementById('retAssumptionsSection').style.display = retState.selectedAge === 'combined' ? 'none' : '';
+}
+
 function renderRetirement(){
   recalcRetirement();
   renderRetAssumptions();
   renderRetExtra();
+  updateRetAssumptionsVisibility();
 }
 
 function setRetSaveStatus(kind){
@@ -1404,12 +1419,20 @@ function attachRetirementHandlers(){
     if(!t.classList || !t.classList.contains('ret-input') || t.dataset.kind !== 'dollar') return;
     t.value = commas(retGet(t.dataset.path));
   });
+  root.addEventListener('change', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('ret-toggle-input')) return;
+    retSet(t.dataset.path, t.checked);
+    recalcRetirement();
+    queueRetSave();
+  });
   document.getElementById('retAgePills').addEventListener('click', e=>{
     const btn = e.target.closest('button[data-age]');
     if(!btn) return;
     retState.selectedAge = btn.dataset.age === 'combined' ? 'combined' : parseInt(btn.dataset.age, 10);
     recalcRetirement();
     renderRetAssumpB();
+    updateRetAssumptionsVisibility();
     queueRetSave();
   });
 }
