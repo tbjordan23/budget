@@ -181,14 +181,14 @@
   .pill.pill-add{padding:.45rem .7rem;color:var(--primary);border-style:dashed;font-size:16px;line-height:1;}
 
   .add-sheet-panel{
-    display:none;align-items:center;gap:.6rem;flex-wrap:wrap;
+    display:none;align-items:flex-end;gap:.6rem;flex-wrap:wrap;
     background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem;margin-bottom:1.25rem;
   }
   .add-sheet-panel label{font-size:12px;color:var(--ink-soft);display:flex;flex-direction:column;gap:.25rem;}
   .add-sheet-panel input[type=text]{width:130px;}
   .add-sheet-panel select{
     font-family:'Inter',sans-serif;font-size:13.5px;font-weight:500;color:var(--ink);
-    border:1.5px solid var(--field-border);background:var(--field-bg);border-radius:9px;padding:.4rem .6rem;
+    border:1.5px solid var(--field-border);background:var(--field-bg);border-radius:9px;padding:.4rem 1.8rem .4rem .6rem;
   }
 
   body.readonly-view .row-remove,body.readonly-view .add-btn{display:none;}
@@ -864,7 +864,12 @@ async function init(){
     const copyFromId = document.getElementById('newSheetCopyFrom').value;
     const id = 'sheet-' + Date.now();
     let newState;
-    if(copyFromId){
+    if(copyFromId && copyFromId === currentSheetId){
+      // The currently open sheet may still hold seeded/default values that
+      // were never actually written to storage (nothing to load yet), so
+      // clone what's on screen rather than fetching — a fetch here can 404.
+      newState = JSON.parse(JSON.stringify(state));
+    } else if(copyFromId){
       try{
         const result = await window.storage.get(sheetStorageKey(copyFromId), true);
         newState = JSON.parse(result.value);
