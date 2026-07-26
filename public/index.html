@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jordan Budget — 2026</title>
+<title>Jordan Finance — 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -55,8 +55,8 @@
 
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem;}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:calc(.45rem + 6px) .6rem .45rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;}
-  .stat .label{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:9px 0 0;font-weight:500;white-space:nowrap;line-height:1.2;}
-  .stat .value{font-family:'Inter',sans-serif;font-size:21px;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.15;}
+  .stat .label{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 0;font-weight:500;white-space:nowrap;line-height:1.2;}
+  .stat .value{font-family:'Inter',sans-serif;font-size:21px;font-weight:900;color:var(--ink);letter-spacing:-.01em;line-height:1.15;margin-top:-1px;}
   .stat.warn .value{color:var(--warn);}
   .stat.good .value{color:var(--good);}
 
@@ -200,8 +200,12 @@
   body.readonly-view .catdot{pointer-events:none;}
   body.readonly-view input.name-input:disabled,body.readonly-view input.amt-input:disabled{
     color:var(--ink);opacity:1;-webkit-text-fill-color:var(--ink);cursor:default;
+    background:transparent;border-color:transparent;
   }
-  body.readonly-view #payPeriods:disabled{color:#fff;opacity:1;-webkit-text-fill-color:#fff;cursor:default;}
+  body.readonly-view #payPeriods:disabled{
+    color:#fff;opacity:1;-webkit-text-fill-color:#fff;cursor:default;
+    background:transparent;border-color:transparent;
+  }
 
   @media print{
     body{background:#fff;}
@@ -218,7 +222,7 @@
   <div class="topbar">
     <div>
       <p class="eyebrow">Household ledger · 2026</p>
-      <h1>Jordan budget</h1>
+      <h1>Jordan Finance</h1>
       <p class="sub">Shared with everyone who has this page — edit any number, it saves automatically.</p>
     </div>
     <div class="actions">
@@ -281,13 +285,13 @@
     <h2>Annual summary</h2>
     <div class="arow"><span>Pay periods per year (biweekly)</span><span class="amt-wrap"><input type="number" id="payPeriods" step="1"></span></div>
     <div class="arow"><span>Annual net income (paychecks)</span><span class="amt-wrap" id="annualNet"></span></div>
-    <div class="arow"><span>65% of Adobe Bonus + IDC income</span><span class="amt-wrap" id="annualOther"></span></div>
+    <div class="arow"><span id="annualOtherLabel">65% of Adobe Bonus + IDC income</span><span class="amt-wrap" id="annualOther"></span></div>
     <div class="arow"><span>Total annual net income</span><span class="amt-wrap" id="annualNetTotal"></span></div>
     <div class="arow"><span>Total annual budgeted expenses</span><span class="amt-wrap" id="annualExpense"></span></div>
     <div class="arow"><span>Annual surplus / (shortfall)</span><span class="amt-wrap" id="annualSurplus"></span></div>
   </div>
 
-  <p class="foot-note">One extra paycheck lands in 2026, which is why the 1st-payment amount runs lower in some months.</p>
+  <p class="foot-note" id="extraPaycheckNote">One extra paycheck lands in 2026, which is why the 1st-payment amount runs lower in some months.</p>
 
 </div>
 
@@ -524,6 +528,7 @@ function recalcTotals(){
   const salaryItem = state.income.find(i => i.kind === 'salary') || state.income.find(i => i.label.trim() === 'Gross Annual Salary');
   const salary = salaryItem ? salaryItem.val : 0;
   const lockedBonusItem = state.income.find(i => i.locked);
+  const bonusItem = state.income.find(i => i.kind === 'bonus');
   let bonus;
   if(lockedBonusItem){
     bonus = Math.round(salary * 0.2);
@@ -531,9 +536,11 @@ function recalcTotals(){
     const bonusInput = document.querySelector('#incomeRows input.locked');
     if(bonusInput) bonusInput.value = commas(bonus);
   } else {
-    const bonusItem = state.income.find(i => i.kind === 'bonus');
     bonus = bonusItem ? bonusItem.val : 0;
   }
+  document.getElementById('annualOtherLabel').textContent = (lockedBonusItem || bonusItem)
+    ? '65% of Adobe Bonus + IDC income'
+    : '65% of IDC income';
   const idcItem = state.income.find(i => i.kind === 'idc') || state.income.find(i => i.label.trim() === 'IDC Income / year');
   const idc = idcItem ? idcItem.val : 0;
   const byuItem = state.income.find(i => i.kind === 'byu') || state.income.find(i => i.label.trim() === 'BYU Income / year');
@@ -853,6 +860,8 @@ async function loadSheet(id){
   if(sub) sub.textContent = EDITABLE
     ? 'Shared with everyone who has this page — edit any number, it saves automatically.'
     : 'Historical record — read only.';
+  const extraPaycheckNote = document.getElementById('extraPaycheckNote');
+  if(extraPaycheckNote) extraPaycheckNote.style.display = id === '2026' ? '' : 'none';
   renderPills();
   render();
 }
