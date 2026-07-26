@@ -51,6 +51,47 @@ function migrateExtraPaycheckYears() {
 }
 migrateExtraPaycheckYears();
 
+// One-time, idempotent fix: standardize every IDC income line item's label
+// to "IDC Annual Income" (was "IDC Income / year", "IDC Monthly Income", or
+// "IDC Income" depending on the year), and add the missing 2009/2010 IDC
+// income lines that were never recorded for those years.
+function migrateIdcLabels() {
+  function saveState(key, state) {
+    db.prepare(`
+      INSERT INTO storage (key, value, updated_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, JSON.stringify(state));
+  }
+  function loadState(key) {
+    const row = db.prepare('SELECT value FROM storage WHERE key = ?').get(key);
+    return row ? JSON.parse(row.value) : null;
+  }
+
+  for (const key of ['jordan-budget-2026-v1', ...Array.from({ length: 15 }, (_, i) => 'budget-sheet-' + (2011 + i))]) {
+    const state = loadState(key);
+    if (!state || !Array.isArray(state.income)) continue;
+    const item = state.income.find(i => i.kind === 'idc' || /^IDC (Income( \/ year)?|Monthly Income)$/.test(i.label));
+    if (!item || item.label === 'IDC Annual Income') continue;
+    item.label = 'IDC Annual Income';
+    item.kind = 'idc';
+    saveState(key, state);
+  }
+
+  const newIdc = { '2009': 2728, '2010': 3884 };
+  for (const year of Object.keys(newIdc)) {
+    const key = 'budget-sheet-' + year;
+    const state = loadState(key);
+    if (!state || !Array.isArray(state.income)) continue;
+    if (state.income.some(i => i.kind === 'idc')) continue;
+    const idx = state.income.findIndex(i => i.label === 'Gross Monthly Payment');
+    const newItem = { label: 'IDC Annual Income', val: newIdc[year], kind: 'idc' };
+    if (idx === -1) state.income.push(newItem);
+    else state.income.splice(idx + 1, 0, newItem);
+    saveState(key, state);
+  }
+}
+migrateIdcLabels();
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
