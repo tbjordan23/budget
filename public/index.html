@@ -94,17 +94,18 @@
     font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:var(--ink);
     padding:.4rem .6rem;border-radius:9px;cursor:text;transition:all .12s;
   }
-  input[type=number]{width:92px;text-align:right;}
+  input[type=number],input.amt-input{width:92px;text-align:right;}
   input[type=text].name-input{
     width:100%;text-align:left;font-family:'Inter',sans-serif;font-weight:400;font-size:13.5px;
     min-width:0;
   }
   input[type=number]:hover,input[type=text]:hover{border-color:var(--field-border-hover);background:#EFEFFC;}
   input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px var(--primary-tint);}
-  input[type=number].locked{color:var(--ink-soft);background:var(--bg);border-color:var(--line);pointer-events:none;}
+  input[type=number].locked,input.amt-input.locked{color:var(--ink-soft);background:var(--bg);border-color:var(--line);pointer-events:none;}
   .locked-tag{font-size:9.5px;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:.4rem;text-transform:uppercase;letter-spacing:.04em;font-weight:500;vertical-align:middle;}
   input[type=number]::-webkit-inner-spin-button{opacity:0;}
-  #payPeriods{text-align:center;width:64px;}
+  #payPeriods{text-align:center;width:64px;-moz-appearance:textfield;appearance:textfield;}
+  #payPeriods::-webkit-inner-spin-button,#payPeriods::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;width:0;}
 
   .row.total{font-weight:600;padding-top:.65rem;margin-top:.25rem;border-top:2px solid var(--ink);border-bottom:none;}
   .row.total .name{color:var(--ink);font-weight:600;}
@@ -208,11 +209,13 @@
   <div class="grid">
     <div class="card">
       <div class="card-head"><h2>1st payment</h2><span class="total" id="p1TotalTop"></span></div>
+      <p class="sub" id="p1Remaining"></p>
       <div class="flow" id="p1Flow"></div>
       <div id="p1Rows"></div>
     </div>
     <div class="card">
       <div class="card-head"><h2>2nd payment</h2><span class="total" id="p2TotalTop"></span></div>
+      <p class="sub" id="p2Remaining"></p>
       <div class="flow" id="p2Flow"></div>
       <div id="p2Rows"></div>
     </div>
@@ -326,6 +329,7 @@ const defaultState = {
 let state = JSON.parse(JSON.stringify(defaultState));
 const STORE_KEY = 'jordan-budget-2026-v1';
 const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+const commas = n => Math.round(n || 0).toLocaleString('en-US');
 let saveTimer = null;
 const CAT_ORDER = ['giving','housing','transport','subs','everyday'];
 
@@ -342,7 +346,7 @@ function renderRows(container, items, group, withCat){
       row.innerHTML = `
         <span class="name">${item.label} <span class="locked-tag">auto</span></span>
         <span class="amt-wrap"><span class="cur">$</span>
-          <input type="number" class="locked" value="${item.val}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
+          <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(item.val)}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
         <span style="width:22px;"></span>`;
       container.appendChild(row);
       return;
@@ -353,7 +357,7 @@ function renderRows(container, items, group, withCat){
     row.innerHTML = `
       <span class="name"><span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>${catDot}<input type="text" class="name-input" value="${item.label}" data-group="${group}" data-idx="${idx}" data-field="label"></span>
       <span class="amt-wrap"><span class="cur">$</span>
-        <input type="number" value="${item.val}" data-group="${group}" data-idx="${idx}" data-field="val"></span>
+        <input type="text" inputmode="decimal" class="amt-input" value="${commas(item.val)}" data-group="${group}" data-idx="${idx}" data-field="val"></span>
       <button class="row-remove" data-action="remove" data-group="${group}" data-idx="${idx}" aria-label="Remove ${item.label}"></button>`;
     container.appendChild(row);
   });
@@ -365,7 +369,7 @@ function renderSubsLinkRow(){
   row.innerHTML = `
     <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
     <span class="amt-wrap"><span class="cur">$</span>
-      <input type="number" class="locked" value="${subsTotal()}" tabindex="-1">
+      <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(subsTotal())}" tabindex="-1">
     </span>
     <span style="width:22px;"></span>`;
   return row;
@@ -431,9 +435,10 @@ function recalcTotals(){
   const p1t = p1Total();
   const p2t = p2Total();
   const subT = subsTotal();
+  const netPaycheck = state.income[2] ? state.income[2].val : 0;
 
   const lockedInput = document.querySelector('#p1Rows input.locked');
-  if(lockedInput) lockedInput.value = subT;
+  if(lockedInput) lockedInput.value = commas(subT);
 
   document.querySelector('#p1Rows .row.total .amt-wrap').textContent = fmt(p1t);
   document.getElementById('p1TotalTop').textContent = fmt(p1t);
@@ -441,15 +446,23 @@ function recalcTotals(){
   document.getElementById('p2TotalTop').textContent = fmt(p2t);
   document.querySelector('#subsRows .row.total .amt-wrap').textContent = fmt(subT);
 
+  const p1Left = netPaycheck - p1t;
+  const p2Left = netPaycheck - p2t;
+  const p1LeftEl = document.getElementById('p1Remaining');
+  const p2LeftEl = document.getElementById('p2Remaining');
+  p1LeftEl.textContent = 'Left after payment: ' + fmt(p1Left);
+  p1LeftEl.style.color = p1Left < 0 ? 'var(--warn)' : '';
+  p2LeftEl.textContent = 'Left after payment: ' + fmt(p2Left);
+  p2LeftEl.style.color = p2Left < 0 ? 'var(--warn)' : '';
+
   renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
   renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
 
   const salary = state.income[0] ? state.income[0].val : 0;
-  const netPaycheck = state.income[2] ? state.income[2].val : 0;
   const bonus = Math.round(salary * 0.2);
   if(state.income[5]) state.income[5].val = bonus;
   const bonusInput = document.querySelector('#incomeRows input.locked');
-  if(bonusInput) bonusInput.value = bonus;
+  if(bonusInput) bonusInput.value = commas(bonus);
   const idc = state.income[6] ? state.income[6].val : 0;
   const annualNet = netPaycheck * state.payPeriods;
   const grossTotal = salary + bonus + idc;
@@ -502,9 +515,27 @@ function attachHandlers(){
       queueSave();
       return;
     }
-    arr[idx].val = t.valueAsNumber || 0;
-    recalcTotals();
-    queueSave();
+    if(field === 'val'){
+      arr[idx].val = parseFloat(t.value.replace(/,/g,'')) || 0;
+      recalcTotals();
+      queueSave();
+    }
+  });
+
+  document.body.addEventListener('focusin', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('amt-input') || t.classList.contains('locked')) return;
+    const arr = groupArray(t.dataset.group);
+    const item = arr && arr[t.dataset.idx];
+    if(item) t.value = item.val === 0 ? '' : String(item.val);
+  });
+
+  document.body.addEventListener('focusout', e=>{
+    const t = e.target;
+    if(!t.classList || !t.classList.contains('amt-input') || t.classList.contains('locked')) return;
+    const arr = groupArray(t.dataset.group);
+    const item = arr && arr[t.dataset.idx];
+    if(item) t.value = commas(item.val);
   });
 
   document.body.addEventListener('click', e=>{
