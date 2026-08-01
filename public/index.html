@@ -505,7 +505,7 @@ const defaultState = {
     {label:'Car Loan (Altima) — America First', val:0, cat:'transport'},
     {label:'Car Loan (Kia) — Carmax Finance', val:0, cat:'transport'},
     {label:'Extra Spending', val:1010, cat:'everyday', kind:'extraSpending', locked:true},
-    {label:'*Subscriptions (see below)', val:0, cat:'subs', kind:'subsLink', locked:true},
+    {label:'Subscriptions', val:0, cat:'subs', kind:'subsLink', locked:true},
   ],
   p2: [
     {label:'Tithing (Adobe)', val:705, cat:'giving'},
@@ -569,9 +569,8 @@ function renderRows(container, items, group, withCat){
       const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
       const lockedHandle = draggable ? '<span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>' : '';
       const lockedDot = (withCat && item.cat) ? `<i class="catdot catdot-static" style="background:${CAT[item.cat].color}"></i>` : '';
-      const tag = item.kind === 'subsLink' ? '' : ' <span class="locked-tag">auto</span>';
       row.innerHTML = `
-        <span class="name">${lockedHandle}${lockedDot}${item.label}${tag}</span>
+        <span class="name">${lockedHandle}${lockedDot}${item.label} <span class="locked-tag">auto</span></span>
         <span class="amt-wrap"><span class="cur">$</span>
           <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(item.val)}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
         ${endSpacer}`;
@@ -611,12 +610,12 @@ function renderSubsLinkRow(){
   row.className = 'row';
   if(!EDITABLE){
     row.innerHTML = `
-      <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
+      <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>Subscriptions <span class="locked-tag">auto</span></span>
       <span class="amt-wrap"><span class="cur">$</span><span class="amt-text">${commas(subsTotal())}</span></span>`;
     return row;
   }
   row.innerHTML = `
-    <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
+    <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>Subscriptions <span class="locked-tag">auto</span></span>
     <span class="amt-wrap"><span class="cur">$</span>
       <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(subsTotal())}" tabindex="-1">
     </span>
@@ -1097,7 +1096,7 @@ function migrateExtraSpending(arr){
 function migrateSubsLink(p1){
   if(!Array.isArray(p1)) return;
   if(p1.some(i => i.kind === 'subsLink')) return;
-  p1.push({label:'*Subscriptions (see below)', val:0, cat:'subs', kind:'subsLink', locked:true});
+  p1.push({label:'Subscriptions', val:0, cat:'subs', kind:'subsLink', locked:true});
 }
 
 async function loadSheet(id){
