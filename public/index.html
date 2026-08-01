@@ -131,10 +131,7 @@
   .row .catdot:hover{transform:scale(1.35);}
   .row .catdot.catdot-static{cursor:default;}
   .row .catdot.catdot-static:hover{transform:none;}
-  .drag-handle{
-    cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;
-    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;
-  }
+  .drag-handle{cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;user-select:none;touch-action:none;}
   .drag-handle:hover{color:var(--primary);}
   .row[data-drag-group]{transition:background .1s;}
   .row.dragging{opacity:.35;}
@@ -883,52 +880,48 @@ function attachHandlers(){
     }
   });
 
-  // Row reordering uses the Pointer Events API rather than native HTML5
-  // drag-and-drop: native DnD never fires from touch input on mobile
-  // browsers (dragstart/dragover/drop simply don't happen on a phone), so
-  // the handles did nothing there. Pointer Events unify mouse/touch/pen
-  // into one event stream, and setPointerCapture keeps move/up events
-  // routed to the handle even as the finger/cursor travels over other
-  // rows — no separate touch-only code path needed.
   let dragState = null;
 
-  const clearDragVisuals = () => {
-    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-  };
-
-  document.body.addEventListener('pointerdown', e=>{
+  document.body.addEventListener('mousedown', e=>{
     const handle = e.target.closest('[data-drag-handle]');
     if(!handle) return;
     const row = handle.closest('.row[data-drag-group]');
-    if(!row) return;
-    e.preventDefault();
-    if(handle.setPointerCapture) handle.setPointerCapture(e.pointerId);
-    dragState = {pointerId: e.pointerId, group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10), row};
-    row.classList.add('dragging');
+    if(row) row.draggable = true;
   });
 
-  document.body.addEventListener('pointermove', e=>{
-    if(!dragState || e.pointerId !== dragState.pointerId) return;
-    e.preventDefault();
-    const target = document.elementFromPoint(e.clientX, e.clientY);
-    const row = target && target.closest('.row[data-drag-group]');
-    clearDragVisuals();
-    if(row && row.dataset.dragGroup === dragState.group) row.classList.add('drag-over');
+  document.body.addEventListener('dragstart', e=>{
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row){ e.preventDefault(); return; }
+    dragState = {group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10)};
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+    requestAnimationFrame(()=> row.classList.add('dragging'));
   });
 
-  const endDrag = e=>{
-    if(!dragState || e.pointerId !== dragState.pointerId) return;
-    const target = document.elementFromPoint(e.clientX, e.clientY);
-    const row = target && target.closest('.row[data-drag-group]');
-    dragState.row.classList.remove('dragging');
-    clearDragVisuals();
-    if(row && row.dataset.dragGroup === dragState.group){
-      reorder(dragState.group, dragState.idx, parseInt(row.dataset.dragIdx, 10));
-    }
+  document.body.addEventListener('dragover', e=>{
+    if(!dragState) return;
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row || row.dataset.dragGroup !== dragState.group) return;
+    e.preventDefault();
+    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    row.classList.add('drag-over');
+  });
+
+  document.body.addEventListener('drop', e=>{
+    if(!dragState) return;
+    const row = e.target.closest('.row[data-drag-group]');
+    if(!row || row.dataset.dragGroup !== dragState.group){ dragState = null; return; }
+    e.preventDefault();
+    reorder(dragState.group, dragState.idx, parseInt(row.dataset.dragIdx, 10));
     dragState = null;
-  };
-  document.body.addEventListener('pointerup', endDrag);
-  document.body.addEventListener('pointercancel', endDrag);
+  });
+
+  document.body.addEventListener('dragend', e=>{
+    const row = e.target.closest('.row[data-drag-group]');
+    if(row){ row.draggable = false; row.classList.remove('dragging'); }
+    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    dragState = null;
+  });
 }
 
 function reorder(group, fromIdx, toIdx){
