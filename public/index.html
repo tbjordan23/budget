@@ -564,7 +564,7 @@ function renderRows(container, items, group, withCat){
     row.className = 'row';
     if(item.locked){
       if(item.kind === 'subsLink' && state.subs.length === 0) return;
-      const draggable = EDITABLE && withCat;
+      const draggable = EDITABLE;
       if(draggable){ row.dataset.dragGroup = group; row.dataset.dragIdx = idx; }
       const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
       const lockedHandle = draggable ? '<span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>' : '';
