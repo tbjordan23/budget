@@ -131,10 +131,11 @@
   .row .catdot:hover{transform:scale(1.35);}
   .row .catdot.catdot-static{cursor:default;}
   .row .catdot.catdot-static:hover{transform:none;}
-  .drag-handle{cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;user-select:none;touch-action:none;}
+  .drag-handle{
+    cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;
+  }
   .drag-handle:hover{color:var(--primary);}
-  .drag-handle.drag-handle-static{cursor:default;}
-  .drag-handle.drag-handle-static:hover{color:var(--ink-soft);}
   .row[data-drag-group]{transition:background .1s;}
   .row.dragging{opacity:.35;}
   .row.drag-over{box-shadow:inset 0 2px 0 var(--primary);}
@@ -504,6 +505,7 @@ const defaultState = {
     {label:'Car Loan (Altima) — America First', val:0, cat:'transport'},
     {label:'Car Loan (Kia) — Carmax Finance', val:0, cat:'transport'},
     {label:'Extra Spending', val:1010, cat:'everyday', kind:'extraSpending', locked:true},
+    {label:'*Subscriptions (see below)', val:0, cat:'subs', kind:'subsLink', locked:true},
   ],
   p2: [
     {label:'Tithing (Adobe)', val:705, cat:'giving'},
@@ -544,7 +546,10 @@ let saveTimer = null;
 const CAT_ORDER = ['giving','housing','transport','subs','everyday'];
 
 function subsTotal(){ return state.subs.reduce((s,i)=>s+i.val,0); }
-function p1Total(){ return state.p1.reduce((s,i)=>s+i.val,0) + subsTotal(); }
+function p1Total(){
+  const hasSubsLinkItem = state.p1.some(i => i.kind === 'subsLink');
+  return state.p1.reduce((s,i)=>s+i.val,0) + (hasSubsLinkItem ? 0 : subsTotal());
+}
 function p2Total(){ return state.p2.reduce((s,i)=>s+i.val,0); }
 
 function renderRows(container, items, group, withCat){
@@ -558,11 +563,15 @@ function renderRows(container, items, group, withCat){
     const row = document.createElement('div');
     row.className = 'row';
     if(item.locked){
+      if(item.kind === 'subsLink' && state.subs.length === 0) return;
+      const draggable = EDITABLE && withCat;
+      if(draggable){ row.dataset.dragGroup = group; row.dataset.dragIdx = idx; }
       const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
-      const lockedHandle = (EDITABLE && withCat) ? '<span class="drag-handle drag-handle-static">⠿</span>' : '';
+      const lockedHandle = draggable ? '<span class="drag-handle" data-drag-handle title="Drag to reorder">⠿</span>' : '';
       const lockedDot = (withCat && item.cat) ? `<i class="catdot catdot-static" style="background:${CAT[item.cat].color}"></i>` : '';
+      const tag = item.kind === 'subsLink' ? '' : ' <span class="locked-tag">auto</span>';
       row.innerHTML = `
-        <span class="name">${lockedHandle}${lockedDot}${item.label} <span class="locked-tag">auto</span></span>
+        <span class="name">${lockedHandle}${lockedDot}${item.label}${tag}</span>
         <span class="amt-wrap"><span class="cur">$</span>
           <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(item.val)}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
         ${endSpacer}`;
@@ -595,6 +604,8 @@ function renderRows(container, items, group, withCat){
   });
 }
 
+// Fallback for years saved before Subscriptions became a real, draggable
+// p1 line item (kind:'subsLink') — those years just show a static link row.
 function renderSubsLinkRow(){
   const row = document.createElement('div');
   row.className = 'row';
@@ -605,7 +616,7 @@ function renderSubsLinkRow(){
     return row;
   }
   row.innerHTML = `
-    <span class="name"><span class="drag-handle drag-handle-static">⠿</span><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
+    <span class="name"><i class="catdot" style="background:${CAT.subs.color}"></i>*Subscriptions (see below)</span>
     <span class="amt-wrap"><span class="cur">$</span>
       <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(subsTotal())}" tabindex="-1">
     </span>
@@ -644,7 +655,8 @@ function render(){
 
   const p1c = document.getElementById('p1Rows');
   renderRows(p1c, state.p1, 'p1', true);
-  if(state.subs.length > 0) p1c.appendChild(renderSubsLinkRow());
+  const hasSubsLinkItem = state.p1.some(i => i.kind === 'subsLink');
+  if(!hasSubsLinkItem && state.subs.length > 0) p1c.appendChild(renderSubsLinkRow());
   const p1TotalRow = document.createElement('div');
   p1TotalRow.className = 'row total';
   p1TotalRow.innerHTML = `<span class="name">Total</span><span class="amt-wrap">$0</span>${endSpacer}`;
@@ -683,10 +695,13 @@ function recalcTotals(){
 
   // Extra Spending is auto-derived as whatever's left of the net paycheck
   // once every other line item (and, for payment 1, subscriptions) is paid.
+  // Subscriptions is itself a real (locked) p1 line item mirroring subsTotal().
   const p1ExtraItem = state.p1.find(i => i.kind === 'extraSpending');
+  const p1SubsLinkItem = state.p1.find(i => i.kind === 'subsLink');
   const p2ExtraItem = state.p2.find(i => i.kind === 'extraSpending');
+  if(p1SubsLinkItem) p1SubsLinkItem.val = subT;
   if(p1ExtraItem){
-    const p1Other = state.p1.filter(i => i !== p1ExtraItem).reduce((s,i)=>s+i.val,0) + subT;
+    const p1Other = state.p1.filter(i => i !== p1ExtraItem).reduce((s,i)=>s+i.val,0) + (p1SubsLinkItem ? 0 : subT);
     p1ExtraItem.val = netPaycheck - p1Other;
   }
   if(p2ExtraItem){
@@ -697,12 +712,15 @@ function recalcTotals(){
   const p1t = p1Total();
   const p2t = p2Total();
 
-  const subsLinkInput = document.querySelector('#p1Rows input.locked:not([data-group])');
-  if(subsLinkInput) subsLinkInput.value = commas(subT);
-  const p1ExtraInput = document.querySelector('#p1Rows input.locked[data-group="p1"]');
-  if(p1ExtraInput) p1ExtraInput.value = commas(p1ExtraItem.val);
-  const p2ExtraInput = document.querySelector('#p2Rows input.locked[data-group="p2"]');
-  if(p2ExtraInput) p2ExtraInput.value = commas(p2ExtraItem.val);
+  const patchLockedInput = (container, group, item) => {
+    if(!item) return;
+    const idx = (group === 'p1' ? state.p1 : state.p2).indexOf(item);
+    const input = document.querySelector(`${container} input.locked[data-group="${group}"][data-idx="${idx}"]`);
+    if(input) input.value = commas(item.val);
+  };
+  patchLockedInput('#p1Rows', 'p1', p1SubsLinkItem);
+  patchLockedInput('#p1Rows', 'p1', p1ExtraItem);
+  patchLockedInput('#p2Rows', 'p2', p2ExtraItem);
 
   document.querySelector('#p1Rows .row.total .amt-wrap').textContent = fmt(p1t);
   document.getElementById('p1TotalTop').textContent = fmt(p1ExtraItem ? netPaycheck : p1t);
@@ -732,7 +750,7 @@ function recalcTotals(){
     p2LeftEl.style.color = p2Left < 0 ? 'var(--warn)' : '';
   }
 
-  renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
+  renderFlow(document.getElementById('p1Flow'), p1SubsLinkItem ? state.p1 : [...state.p1, {cat:'subs', val:subT}], p1t);
   renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
 
   const salaryItem = state.income.find(i => i.kind === 'salary') || state.income.find(i => i.label.trim() === 'Gross Annual Salary');
@@ -846,8 +864,8 @@ function attachHandlers(){
     } else if(action === 'add'){
       if(group === 'p1' || group === 'p2'){
         const newItem = {label:'New item', val:0, cat:'everyday'};
-        const extraIdx = arr.findIndex(i => i.kind === 'extraSpending');
-        if(extraIdx === -1) arr.push(newItem); else arr.splice(extraIdx, 0, newItem);
+        const lockedIdx = arr.findIndex(i => i.locked);
+        if(lockedIdx === -1) arr.push(newItem); else arr.splice(lockedIdx, 0, newItem);
       } else {
         arr.push({label:'New item', val:0});
       }
@@ -866,93 +884,52 @@ function attachHandlers(){
     }
   });
 
+  // Row reordering uses the Pointer Events API rather than native HTML5
+  // drag-and-drop: native DnD never fires from touch input on mobile
+  // browsers (dragstart/dragover/drop simply don't happen on a phone), so
+  // the handles did nothing there. Pointer Events unify mouse/touch/pen
+  // into one event stream, and setPointerCapture keeps move/up events
+  // routed to the handle even as the finger/cursor travels over other
+  // rows — no separate touch-only code path needed.
   let dragState = null;
 
-  document.body.addEventListener('mousedown', e=>{
-    const handle = e.target.closest('[data-drag-handle]');
-    if(!handle) return;
-    const row = handle.closest('.row[data-drag-group]');
-    if(row) row.draggable = true;
-  });
-
-  document.body.addEventListener('dragstart', e=>{
-    const row = e.target.closest('.row[data-drag-group]');
-    if(!row){ e.preventDefault(); return; }
-    dragState = {group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10)};
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', '');
-    requestAnimationFrame(()=> row.classList.add('dragging'));
-  });
-
-  document.body.addEventListener('dragover', e=>{
-    if(!dragState) return;
-    const row = e.target.closest('.row[data-drag-group]');
-    if(!row || row.dataset.dragGroup !== dragState.group) return;
-    e.preventDefault();
+  const clearDragVisuals = () => {
     document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    row.classList.add('drag-over');
-  });
+  };
 
-  document.body.addEventListener('drop', e=>{
-    if(!dragState) return;
-    const row = e.target.closest('.row[data-drag-group]');
-    if(!row || row.dataset.dragGroup !== dragState.group){ dragState = null; return; }
-    e.preventDefault();
-    reorder(dragState.group, dragState.idx, parseInt(row.dataset.dragIdx, 10));
-    dragState = null;
-  });
-
-  document.body.addEventListener('dragend', e=>{
-    const row = e.target.closest('.row[data-drag-group]');
-    if(row){ row.draggable = false; row.classList.remove('dragging'); }
-    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    dragState = null;
-  });
-
-  // Native HTML5 drag-and-drop (dragstart/dragover/drop above) never fires
-  // from touch input on mobile browsers, so the drag handles did nothing on
-  // phones/tablets. These touch handlers mirror the same reorder logic.
-  let touchDrag = null;
-
-  document.body.addEventListener('touchstart', e=>{
+  document.body.addEventListener('pointerdown', e=>{
     const handle = e.target.closest('[data-drag-handle]');
     if(!handle) return;
     const row = handle.closest('.row[data-drag-group]');
     if(!row) return;
-    touchDrag = {group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10), row};
-    row.classList.add('dragging');
-  }, {passive: true});
-
-  document.body.addEventListener('touchmove', e=>{
-    if(!touchDrag) return;
     e.preventDefault();
-    const touch = e.touches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    const row = target && target.closest('.row[data-drag-group]');
-    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    if(row && row.dataset.dragGroup === touchDrag.group) row.classList.add('drag-over');
-  }, {passive: false});
-
-  document.body.addEventListener('touchend', e=>{
-    if(!touchDrag) return;
-    const touch = e.changedTouches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    const row = target && target.closest('.row[data-drag-group]');
-    touchDrag.row.classList.remove('dragging');
-    document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    if(row && row.dataset.dragGroup === touchDrag.group){
-      reorder(touchDrag.group, touchDrag.idx, parseInt(row.dataset.dragIdx, 10));
-    }
-    touchDrag = null;
+    if(handle.setPointerCapture) handle.setPointerCapture(e.pointerId);
+    dragState = {pointerId: e.pointerId, group: row.dataset.dragGroup, idx: parseInt(row.dataset.dragIdx, 10), row};
+    row.classList.add('dragging');
   });
 
-  document.body.addEventListener('touchcancel', ()=>{
-    if(touchDrag){
-      touchDrag.row.classList.remove('dragging');
-      document.querySelectorAll('.row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    }
-    touchDrag = null;
+  document.body.addEventListener('pointermove', e=>{
+    if(!dragState || e.pointerId !== dragState.pointerId) return;
+    e.preventDefault();
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const row = target && target.closest('.row[data-drag-group]');
+    clearDragVisuals();
+    if(row && row.dataset.dragGroup === dragState.group) row.classList.add('drag-over');
   });
+
+  const endDrag = e=>{
+    if(!dragState || e.pointerId !== dragState.pointerId) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const row = target && target.closest('.row[data-drag-group]');
+    dragState.row.classList.remove('dragging');
+    clearDragVisuals();
+    if(row && row.dataset.dragGroup === dragState.group){
+      reorder(dragState.group, dragState.idx, parseInt(row.dataset.dragIdx, 10));
+    }
+    dragState = null;
+  };
+  document.body.addEventListener('pointerup', endDrag);
+  document.body.addEventListener('pointercancel', endDrag);
 }
 
 function reorder(group, fromIdx, toIdx){
@@ -1114,6 +1091,15 @@ function migrateExtraSpending(arr){
   }
 }
 
+// Subscriptions used to be a synthetic, non-draggable link row bolted onto
+// payment 1's rendering. Promote it to a real (locked) p1 item so it can be
+// dragged/reordered like everything else and picks up its total in recalc.
+function migrateSubsLink(p1){
+  if(!Array.isArray(p1)) return;
+  if(p1.some(i => i.kind === 'subsLink')) return;
+  p1.push({label:'*Subscriptions (see below)', val:0, cat:'subs', kind:'subsLink', locked:true});
+}
+
 async function loadSheet(id){
   currentSheetId = id;
   const meta = sheetsIndex.find(s => s.id === id);
@@ -1129,6 +1115,7 @@ async function loadSheet(id){
   if(id === '2026'){
     migrateExtraSpending(state.p1);
     migrateExtraSpending(state.p2);
+    migrateSubsLink(state.p1);
   }
   document.body.classList.toggle('readonly-view', !EDITABLE);
   setSaveStatus(EDITABLE ? 'synced' : 'readonly');
