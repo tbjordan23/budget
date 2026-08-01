@@ -68,11 +68,18 @@
 
   .ret-estimates-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:2.5rem;}
   .ret-estimates-grid.ret-single-card{grid-template-columns:1fr;}
-  .ret-estimate-block{display:flex;flex-direction:column;}
-  .ret-mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
-  .ret-mini-stats .stat{padding:.4rem .5rem .35rem;gap:0;}
-  .ret-mini-stats .stat .label{margin:0 0 2px;font-size:8.5px;width:100%;text-align:center;}
-  .ret-mini-stats .stat .value{font-size:16px;width:100%;text-align:center;}
+  .ret-estimate-block{
+    display:flex;flex-direction:column;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  }
+  .ret-mini-stats{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line);}
+  .ret-mini-stats .stat{
+    background:transparent;border:none;border-radius:0;padding:.6rem .5rem;gap:2px;
+  }
+  .ret-mini-stats .stat:first-child{border-right:1px solid var(--line);}
+  .ret-mini-stats .stat .label{margin:0;font-size:8.5px;width:100%;text-align:center;}
+  .ret-mini-stats .stat .value{margin:0;font-size:16px;width:100%;text-align:center;}
+  .ret-estimate-card{padding:1.3rem 1.4rem 1.1rem;}
 
   .age-select-row{display:flex;flex-wrap:wrap;gap:.6rem;}
   .age-chip{
@@ -115,6 +122,8 @@
   .ret-tooltip .tt-val{margin-left:auto;font-weight:600;padding-left:.6rem;}
 
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;gap:1rem;flex-wrap:wrap;}
+  .topbar > div:first-child{flex:1 1 0;min-width:0;}
+  .topbar .actions{flex-shrink:0;}
   .eyebrow{font-family:'Sora',sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);font-weight:600;margin:0 0 .4rem;}
   h1{font-family:'Sora',sans-serif;font-weight:700;font-size:clamp(28px,4vw,38px);margin:0;color:var(--ink);letter-spacing:-.02em;}
   .sub{color:var(--ink-soft);font-size:14px;margin-top:.4rem;}
@@ -406,28 +415,28 @@
     <div class="ret-estimates-grid" id="retEstimatesGrid">
       <div class="ret-estimate-block" id="retBlock59">
         <div class="ret-mini-stats" id="retMiniStats59"></div>
-        <div class="card">
+        <div class="ret-estimate-card">
           <div class="card-head"><h2>At age 59 <span class="ret-year" id="retAge59YearLabel"></span></h2></div>
           <div id="retAge59Rows"></div>
         </div>
       </div>
       <div class="ret-estimate-block" id="retBlock60">
         <div class="ret-mini-stats" id="retMiniStats60"></div>
-        <div class="card">
+        <div class="ret-estimate-card">
           <div class="card-head"><h2>At age 60 <span class="ret-year" id="retAge60YearLabel"></span></h2></div>
           <div id="retAge60Rows"></div>
         </div>
       </div>
       <div class="ret-estimate-block" id="retBlock61">
         <div class="ret-mini-stats" id="retMiniStats61"></div>
-        <div class="card">
+        <div class="ret-estimate-card">
           <div class="card-head"><h2>At age 61 <span class="ret-year" id="retAge61YearLabel"></span></h2></div>
           <div id="retAge61Rows"></div>
         </div>
       </div>
       <div class="ret-estimate-block" id="retBlock62">
         <div class="ret-mini-stats" id="retMiniStats62"></div>
-        <div class="card">
+        <div class="ret-estimate-card">
           <div class="card-head"><h2>At age 62 <span class="ret-year" id="retAge62YearLabel"></span></h2></div>
           <div id="retAge62Rows"></div>
         </div>
