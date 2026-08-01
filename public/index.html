@@ -129,6 +129,8 @@
   .row .name{font-size:13.5px;color:var(--ink);flex:1;display:flex;align-items:center;min-width:0;}
   .row .catdot{width:9px;height:9px;border-radius:50%;margin-right:.55rem;flex-shrink:0;cursor:pointer;transition:transform .12s;}
   .row .catdot:hover{transform:scale(1.35);}
+  .row .catdot.catdot-static{cursor:default;}
+  .row .catdot.catdot-static:hover{transform:none;}
   .drag-handle{cursor:grab;color:var(--ink-soft);margin-right:.5rem;flex-shrink:0;font-size:13px;letter-spacing:-1px;user-select:none;touch-action:none;}
   .drag-handle:hover{color:var(--primary);}
   .row[data-drag-group]{transition:background .1s;}
@@ -555,8 +557,9 @@ function renderRows(container, items, group, withCat){
     row.className = 'row';
     if(item.locked){
       const endSpacer = EDITABLE ? '<span style="width:22px;"></span>' : '';
+      const lockedDot = (withCat && item.cat) ? `<i class="catdot catdot-static" style="background:${CAT[item.cat].color}"></i>` : '';
       row.innerHTML = `
-        <span class="name">${item.label} <span class="locked-tag">auto</span></span>
+        <span class="name">${lockedDot}${item.label} <span class="locked-tag">auto</span></span>
         <span class="amt-wrap"><span class="cur">$</span>
           <input type="text" inputmode="decimal" class="amt-input locked" value="${commas(item.val)}" tabindex="-1" data-group="${group}" data-idx="${idx}"></span>
         ${endSpacer}`;
@@ -704,14 +707,27 @@ function recalcTotals(){
   document.getElementById('p2TotalTop').textContent = fmt(p2ExtraItem ? netPaycheck : p2t);
   document.querySelector('#subsRows .row.total .amt-wrap').textContent = fmt(subT);
 
-  const p1Left = netPaycheck - p1t + extraMonthly;
-  const p2Left = netPaycheck - p2t;
   const p1LeftEl = document.getElementById('p1Remaining');
   const p2LeftEl = document.getElementById('p2Remaining');
-  p1LeftEl.textContent = 'Left after payment: ' + fmt(p1Left);
-  p1LeftEl.style.color = p1Left < 0 ? 'var(--warn)' : '';
-  p2LeftEl.textContent = 'Left after payment: ' + fmt(p2Left);
-  p2LeftEl.style.color = p2Left < 0 ? 'var(--warn)' : '';
+  // Extra Spending now soaks up exactly what's left of the paycheck, so this
+  // line would always read $0 once the auto-calc is active — only show it
+  // for years still relying on a manually-entered Extra Spending amount.
+  if(p1ExtraItem){
+    p1LeftEl.style.display = 'none';
+  } else {
+    const p1Left = netPaycheck - p1t + extraMonthly;
+    p1LeftEl.style.display = '';
+    p1LeftEl.textContent = 'Left after payment: ' + fmt(p1Left);
+    p1LeftEl.style.color = p1Left < 0 ? 'var(--warn)' : '';
+  }
+  if(p2ExtraItem){
+    p2LeftEl.style.display = 'none';
+  } else {
+    const p2Left = netPaycheck - p2t;
+    p2LeftEl.style.display = '';
+    p2LeftEl.textContent = 'Left after payment: ' + fmt(p2Left);
+    p2LeftEl.style.color = p2Left < 0 ? 'var(--warn)' : '';
+  }
 
   renderFlow(document.getElementById('p1Flow'), [...state.p1, {cat:'subs', val:subT}], p1t);
   renderFlow(document.getElementById('p2Flow'), state.p2, p2t);
