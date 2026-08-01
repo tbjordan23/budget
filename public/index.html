@@ -137,7 +137,7 @@
   .amt-wrap{display:flex;align-items:center;font-family:'Inter',sans-serif;font-size:13.5px;}
   .amt-wrap .cur{color:var(--ink-soft);margin-right:3px;}
   input[type=number],input[type=text]{
-    border:1.5px solid var(--field-border);background:var(--field-bg);
+    border:1.5px solid var(--line);background:transparent;
     font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:var(--ink);
     padding:.4rem .6rem;border-radius:9px;cursor:text;transition:all .12s;
   }
@@ -146,8 +146,8 @@
     width:100%;text-align:left;font-family:'Inter',sans-serif;font-weight:400;font-size:13.5px;
     min-width:0;
   }
-  input[type=number]:hover,input[type=text]:hover{border-color:var(--field-border-hover);background:#EFEFFC;}
-  input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px var(--primary-tint);}
+  input[type=number]:hover,input[type=text]:hover{border-color:var(--field-border-hover);background:var(--field-bg);}
+  input[type=number]:focus,input[type=text]:focus{outline:none;border-color:var(--primary);background:var(--field-bg);box-shadow:0 0 0 3px var(--primary-tint);}
   input[type=number].locked,input.amt-input.locked{color:var(--ink-soft);background:var(--bg);border-color:var(--line);pointer-events:none;}
   .locked-tag{font-size:9.5px;color:var(--ink-soft);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-left:.4rem;text-transform:uppercase;letter-spacing:.04em;font-weight:500;vertical-align:middle;}
   input[type=number]::-webkit-inner-spin-button{opacity:0;}
@@ -499,7 +499,7 @@ const defaultState = {
     {label:'Car Loan (Corolla) — America First', val:0, cat:'transport'},
     {label:'Car Loan (Altima) — America First', val:0, cat:'transport'},
     {label:'Car Loan (Kia) — Carmax Finance', val:0, cat:'transport'},
-    {label:'Extra Spending', val:1010, cat:'everyday'},
+    {label:'Extra Spending', val:1010, cat:'everyday', kind:'extraSpending', locked:true},
   ],
   p2: [
     {label:'Tithing (Adobe)', val:705, cat:'giving'},
@@ -507,7 +507,7 @@ const defaultState = {
     {label:'Mortgage (Mr. Cooper)', val:2273, cat:'housing'},
     {label:'T-Mobile Bill', val:108, cat:'housing'},
     {label:'Car Loan (Van) — US Bank', val:468, cat:'transport'},
-    {label:'Extra Spending', val:1379, cat:'everyday'},
+    {label:'Extra Spending', val:1379, cat:'everyday', kind:'extraSpending', locked:true},
   ],
   subs: [
     {label:'Hulu', val:96},
@@ -670,20 +670,38 @@ function render(){
 }
 
 function recalcTotals(){
-  const p1t = p1Total();
-  const p2t = p2Total();
   const subT = subsTotal();
   const netPaycheckItem = state.income.find(i => i.kind === 'netPaycheck') || state.income.find(i => i.label.trim() === 'Net Paycheck (every 2 weeks)');
   const netPaycheck = netPaycheckItem ? netPaycheckItem.val : 0;
   const extraMonthly = state.extraMonthly || 0;
 
-  const lockedInput = document.querySelector('#p1Rows input.locked');
-  if(lockedInput) lockedInput.value = commas(subT);
+  // Extra Spending is auto-derived as whatever's left of the net paycheck
+  // once every other line item (and, for payment 1, subscriptions) is paid.
+  const p1ExtraItem = state.p1.find(i => i.kind === 'extraSpending');
+  const p2ExtraItem = state.p2.find(i => i.kind === 'extraSpending');
+  if(p1ExtraItem){
+    const p1Other = state.p1.filter(i => i !== p1ExtraItem).reduce((s,i)=>s+i.val,0) + subT;
+    p1ExtraItem.val = netPaycheck - p1Other;
+  }
+  if(p2ExtraItem){
+    const p2Other = state.p2.filter(i => i !== p2ExtraItem).reduce((s,i)=>s+i.val,0);
+    p2ExtraItem.val = netPaycheck - p2Other;
+  }
+
+  const p1t = p1Total();
+  const p2t = p2Total();
+
+  const subsLinkInput = document.querySelector('#p1Rows input.locked:not([data-group])');
+  if(subsLinkInput) subsLinkInput.value = commas(subT);
+  const p1ExtraInput = document.querySelector('#p1Rows input.locked[data-group="p1"]');
+  if(p1ExtraInput) p1ExtraInput.value = commas(p1ExtraItem.val);
+  const p2ExtraInput = document.querySelector('#p2Rows input.locked[data-group="p2"]');
+  if(p2ExtraInput) p2ExtraInput.value = commas(p2ExtraItem.val);
 
   document.querySelector('#p1Rows .row.total .amt-wrap').textContent = fmt(p1t);
-  document.getElementById('p1TotalTop').textContent = fmt(p1t);
+  document.getElementById('p1TotalTop').textContent = fmt(p1ExtraItem ? netPaycheck : p1t);
   document.querySelector('#p2Rows .row.total .amt-wrap').textContent = fmt(p2t);
-  document.getElementById('p2TotalTop').textContent = fmt(p2t);
+  document.getElementById('p2TotalTop').textContent = fmt(p2ExtraItem ? netPaycheck : p2t);
   document.querySelector('#subsRows .row.total .amt-wrap').textContent = fmt(subT);
 
   const p1Left = netPaycheck - p1t + extraMonthly;
@@ -808,7 +826,9 @@ function attachHandlers(){
       queueSave();
     } else if(action === 'add'){
       if(group === 'p1' || group === 'p2'){
-        arr.push({label:'New item', val:0, cat:'everyday'});
+        const newItem = {label:'New item', val:0, cat:'everyday'};
+        const extraIdx = arr.findIndex(i => i.kind === 'extraSpending');
+        if(extraIdx === -1) arr.push(newItem); else arr.splice(extraIdx, 0, newItem);
       } else {
         arr.push({label:'New item', val:0});
       }
@@ -1016,6 +1036,18 @@ function migrateIncomeKinds(income){
   });
 }
 
+// Extra Spending rows saved before this became an auto-calculated field only
+// have a label — backfill kind/locked so old saved data on the current year
+// picks up the auto behavior instead of staying a plain editable line item.
+function migrateExtraSpending(arr){
+  if(!Array.isArray(arr)) return;
+  const item = arr.find(i => i.kind === 'extraSpending') || arr.find(i => (i.label || '').trim() === 'Extra Spending');
+  if(item && item.kind !== 'extraSpending'){
+    item.kind = 'extraSpending';
+    item.locked = true;
+  }
+}
+
 async function loadSheet(id){
   currentSheetId = id;
   const meta = sheetsIndex.find(s => s.id === id);
@@ -1028,6 +1060,10 @@ async function loadSheet(id){
     state = id === '2026' ? JSON.parse(JSON.stringify(defaultState)) : {income:[], p1:[], p2:[], subs:[], payPeriods:26};
   }
   migrateIncomeKinds(state.income);
+  if(id === '2026'){
+    migrateExtraSpending(state.p1);
+    migrateExtraSpending(state.p2);
+  }
   document.body.classList.toggle('readonly-view', !EDITABLE);
   setSaveStatus(EDITABLE ? 'synced' : 'readonly');
   const sub = document.querySelector('#page-ledger .sub');
