@@ -135,6 +135,7 @@
     display:flex;align-items:center;gap:.4rem;transition:all .15s;
   }
   button.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  button.active{background:var(--primary-tint);border-color:var(--primary);color:var(--primary-deep);}
   button:hover{border-color:var(--field-border-hover);background:var(--primary-tint);}
   button.primary:hover{background:var(--primary-deep);border-color:var(--primary-deep);}
 
@@ -357,11 +358,8 @@
     <div class="card-head"><h2>Salary &amp; expense trends</h2></div>
     <div class="ret-chart-legend" id="trendsChartLegend"></div>
     <div class="ret-chart-wrap" id="trendsChartWrap"></div>
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:1.25rem;margin-bottom:1rem;">
-      <p class="section-heading" style="margin:0;">Years shown</p>
-      <button type="button" id="trendsSelectAllBtn" style="padding:.35rem .8rem;font-size:12px;"></button>
-    </div>
-    <div class="age-select-row" id="trendsYearSelect"></div>
+    <p class="section-heading" style="margin-top:1.25rem;">Time range</p>
+    <div class="pills-bar" id="trendsRangeBar"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -885,7 +883,7 @@ function recalcTotals(){
   if(trendsOpen){
     const meta = sheetsIndex.find(s => s.id === currentSheetId);
     const pt = meta && trendsData.find(p => p.year === meta.year);
-    if(pt){ pt.salary = salary; pt.totalExpense = totalExpense; renderTrendsChart(); }
+    if(pt){ pt.salary = salary; pt.totalExpense = totalExpense; pt.grossIncome = grossTotal; renderTrendsChart(); }
   }
 }
 
@@ -1804,9 +1802,16 @@ function attachNetWorthHandlers(){
 
 const TRENDS_COLOR_SALARY = 'var(--primary)';
 const TRENDS_COLOR_EXPENSE = 'var(--rose)';
+const TRENDS_COLOR_GROSS = 'var(--violet)';
 let trendsData = [];
-let trendsSelectedYears = new Set();
 let trendsOpen = false;
+const TRENDS_RANGES = [
+  {id: '5', label: 'Last 5 years'},
+  {id: '10', label: 'Last 10 years'},
+  {id: '15', label: 'Last 15 years'},
+  {id: 'all', label: 'All time'},
+];
+let trendsRange = 'all';
 
 // Mirrors recalcTotals()'s auto-derivation of Subscriptions/Extra Spending so
 // historical sheets (which lack those `kind` tags and just store final
@@ -1841,7 +1846,17 @@ function computeYearlySummary(data){
   const p2t = p2.reduce((s,i)=>s+i.val, 0);
   const payPeriods = data.payPeriods || 26;
   const totalExpense = (p1t + p2t) * (payPeriods / 2);
-  return {salary, totalExpense};
+
+  const lockedBonusItem = income.find(i => i.locked);
+  const bonusItem = income.find(i => i.kind === 'bonus');
+  const bonus = lockedBonusItem ? Math.round(salary * 0.2) : (bonusItem ? bonusItem.val : 0);
+  const idcItem = income.find(i => i.kind === 'idc') || income.find(i => (i.label || '').trim() === 'IDC Income / year');
+  const idc = idcItem ? idcItem.val : 0;
+  const byuItem = income.find(i => i.kind === 'byu') || income.find(i => (i.label || '').trim() === 'BYU Income / year');
+  const byu = byuItem ? byuItem.val : 0;
+  const grossIncome = salary + bonus + idc + byu;
+
+  return {salary, totalExpense, grossIncome};
 }
 
 async function loadTrendsData(){
@@ -1862,32 +1877,23 @@ async function loadTrendsData(){
   return points;
 }
 
-function renderTrendsYearSelect(){
-  const el = document.getElementById('trendsYearSelect');
-  el.innerHTML = trendsData.map(p => `
-    <label class="age-chip" data-year="${p.year}">
-      <input type="checkbox" value="${p.year}">
-      <span class="chip-box"></span>
-      <span>${p.year}</span>
-    </label>`).join('');
-  syncTrendsYearSelectUI();
+function renderTrendsRangeBar(){
+  const el = document.getElementById('trendsRangeBar');
+  el.innerHTML = TRENDS_RANGES.map(r => `
+    <button type="button" class="pill pill-solo${r.id === trendsRange ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`).join('');
 }
 
-function syncTrendsYearSelectUI(){
-  document.querySelectorAll('#trendsYearSelect .age-chip').forEach(chip=>{
-    const year = parseInt(chip.dataset.year, 10);
-    const checked = trendsSelectedYears.has(year);
-    chip.classList.toggle('active', checked);
-    chip.querySelector('input').checked = checked;
-  });
-  const btn = document.getElementById('trendsSelectAllBtn');
-  const allSelected = trendsData.length > 0 && trendsData.every(p => trendsSelectedYears.has(p.year));
-  btn.textContent = allSelected ? 'Deselect all' : 'Select all';
+function trendsFilteredPoints(){
+  const sorted = trendsData.slice().sort((a,b)=>a.year - b.year);
+  if(trendsRange === 'all' || sorted.length === 0) return sorted;
+  const maxYear = sorted[sorted.length - 1].year;
+  const cutoff = maxYear - parseInt(trendsRange, 10) + 1;
+  return sorted.filter(p => p.year >= cutoff);
 }
 
 function renderTrendsChart(){
   const wrap = document.getElementById('trendsChartWrap');
-  const pts = trendsData.filter(p => trendsSelectedYears.has(p.year)).sort((a,b)=>a.year - b.year);
+  const pts = trendsFilteredPoints();
   if(pts.length === 0){
     wrap.innerHTML = '<p class="placeholder-card">Select at least one year to see the chart.</p>';
     document.getElementById('trendsChartLegend').innerHTML = '';
@@ -1897,7 +1903,7 @@ function renderTrendsChart(){
   const plotW = W - ML - MR, plotH = H - MT - MB;
   const minYear = pts[0].year, maxYear = pts[pts.length - 1].year;
   const span = Math.max(maxYear - minYear, 1);
-  const maxVal = Math.max(...pts.map(p => Math.max(p.salary, p.totalExpense))) * 1.08 || 1;
+  const maxVal = Math.max(...pts.map(p => Math.max(p.salary, p.totalExpense, p.grossIncome))) * 1.08 || 1;
   const xPos = year => pts.length === 1 ? ML + plotW / 2 : ML + (year - minYear) / span * plotW;
   const yPos = val => MT + plotH - (val / maxVal) * plotH;
 
@@ -1918,12 +1924,14 @@ function renderTrendsChart(){
   });
 
   const dotsSvg = pts.map(p => `
+      <circle cx="${xPos(p.year).toFixed(1)}" cy="${yPos(p.grossIncome).toFixed(1)}" r="3" fill="${TRENDS_COLOR_GROSS}" stroke="var(--card)" stroke-width="1.5"/>
       <circle cx="${xPos(p.year).toFixed(1)}" cy="${yPos(p.salary).toFixed(1)}" r="3" fill="${TRENDS_COLOR_SALARY}" stroke="var(--card)" stroke-width="1.5"/>
       <circle cx="${xPos(p.year).toFixed(1)}" cy="${yPos(p.totalExpense).toFixed(1)}" r="3" fill="${TRENDS_COLOR_EXPENSE}" stroke="var(--card)" stroke-width="1.5"/>`).join('');
 
   wrap.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
       ${gridSvg}
+      <path d="${linePath('grossIncome')}" fill="none" stroke="${TRENDS_COLOR_GROSS}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <path d="${linePath('totalExpense')}" fill="none" stroke="${TRENDS_COLOR_EXPENSE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <path d="${linePath('salary')}" fill="none" stroke="${TRENDS_COLOR_SALARY}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dotsSvg}
@@ -1955,6 +1963,7 @@ function renderTrendsChart(){
     tooltip.style.left = Math.min(Math.max(cxPx, 70), rect.width - 70) + 'px';
     tooltip.style.opacity = '1';
     tooltip.innerHTML = `<div class="tt-title">${nearest.year}</div>
+      <div class="tt-row"><i style="background:${TRENDS_COLOR_GROSS}"></i>Gross income<span class="tt-val">${fmt(nearest.grossIncome)}</span></div>
       <div class="tt-row"><i style="background:${TRENDS_COLOR_SALARY}"></i>Gross salary<span class="tt-val">${fmt(nearest.salary)}</span></div>
       <div class="tt-row"><i style="background:${TRENDS_COLOR_EXPENSE}"></i>Total expenses<span class="tt-val">${fmt(nearest.totalExpense)}</span></div>`;
   }
@@ -1962,26 +1971,33 @@ function renderTrendsChart(){
   overlay.addEventListener('pointerleave', () => { crosshair.style.opacity = '0'; tooltip.style.opacity = '0'; });
 
   document.getElementById('trendsChartLegend').innerHTML = `
+    <span><i style="background:${TRENDS_COLOR_GROSS}"></i>Total annual gross income</span>
     <span><i style="background:${TRENDS_COLOR_SALARY}"></i>Gross annual salary</span>
     <span><i style="background:${TRENDS_COLOR_EXPENSE}"></i>Total annual expenses</span>`;
 }
 
 async function refreshTrends(){
   trendsData = await loadTrendsData();
-  const knownYears = new Set(trendsData.map(p => p.year));
-  if(trendsSelectedYears.size === 0){
-    trendsData.forEach(p => trendsSelectedYears.add(p.year));
-  } else {
-    trendsSelectedYears.forEach(y => { if(!knownYears.has(y)) trendsSelectedYears.delete(y); });
-  }
-  renderTrendsYearSelect();
+  renderTrendsRangeBar();
   renderTrendsChart();
 }
 
+async function openTrends(){
+  trendsOpen = true;
+  document.getElementById('trendsCard').style.display = '';
+  document.getElementById('trendsBtn').classList.add('active');
+  await refreshTrends();
+}
+
+function closeTrends(){
+  trendsOpen = false;
+  document.getElementById('trendsCard').style.display = 'none';
+  document.getElementById('trendsBtn').classList.remove('active');
+}
+
 async function toggleTrends(){
-  trendsOpen = !trendsOpen;
-  document.getElementById('trendsCard').style.display = trendsOpen ? '' : 'none';
-  if(trendsOpen) await refreshTrends();
+  if(trendsOpen) closeTrends();
+  else await openTrends();
 }
 
 function showPage(page){
@@ -2000,19 +2016,11 @@ async function init(){
   });
 
   document.getElementById('trendsBtn').addEventListener('click', toggleTrends);
-  document.getElementById('trendsYearSelect').addEventListener('change', e=>{
-    const cb = e.target.closest('input[type=checkbox]');
-    if(!cb) return;
-    const year = parseInt(cb.closest('.age-chip').dataset.year, 10);
-    if(cb.checked) trendsSelectedYears.add(year); else trendsSelectedYears.delete(year);
-    syncTrendsYearSelectUI();
-    renderTrendsChart();
-  });
-  document.getElementById('trendsSelectAllBtn').addEventListener('click', ()=>{
-    const allSelected = trendsData.length > 0 && trendsData.every(p => trendsSelectedYears.has(p.year));
-    if(allSelected) trendsSelectedYears.clear();
-    else trendsData.forEach(p => trendsSelectedYears.add(p.year));
-    syncTrendsYearSelectUI();
+  document.getElementById('trendsRangeBar').addEventListener('click', e=>{
+    const btn = e.target.closest('button[data-range]');
+    if(!btn) return;
+    trendsRange = btn.dataset.range;
+    renderTrendsRangeBar();
     renderTrendsChart();
   });
 
