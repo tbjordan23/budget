@@ -323,6 +323,7 @@
     </div>
     <div class="actions">
       <span class="save-flag" id="saveFlag"><span class="dot" id="saveDot"></span><span id="saveText">synced</span></span>
+      <button type="button" id="trendsBtn">Trends</button>
       <button class="primary" onclick="window.print()">Print</button>
     </div>
   </div>
@@ -350,6 +351,17 @@
     <span><i class="dot" style="background:#8B5CF6"></i>Transportation</span>
     <span><i class="dot" style="background:#F43F5E"></i>Subscriptions</span>
     <span><i class="dot" style="background:#22C55E"></i>Everyday</span>
+  </div>
+
+  <div class="card" id="trendsCard" style="display:none; margin-bottom:16px;">
+    <div class="card-head"><h2>Salary &amp; expense trends</h2></div>
+    <div class="ret-chart-legend" id="trendsChartLegend"></div>
+    <div class="ret-chart-wrap" id="trendsChartWrap"></div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:1.25rem;margin-bottom:1rem;">
+      <p class="section-heading" style="margin:0;">Years shown</p>
+      <button type="button" id="trendsSelectAllBtn" style="padding:.35rem .8rem;font-size:12px;"></button>
+    </div>
+    <div class="age-select-row" id="trendsYearSelect"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -869,6 +881,12 @@ function recalcTotals(){
   const surplusCard = document.getElementById('statSurplusCard');
   surplusCard.classList.remove('good','warn');
   surplusCard.classList.add(surplus >= 0 ? 'good' : 'warn');
+
+  if(trendsOpen){
+    const meta = sheetsIndex.find(s => s.id === currentSheetId);
+    const pt = meta && trendsData.find(p => p.year === meta.year);
+    if(pt){ pt.salary = salary; pt.totalExpense = totalExpense; renderTrendsChart(); }
+  }
 }
 
 function groupArray(group){
@@ -1784,6 +1802,188 @@ function attachNetWorthHandlers(){
   });
 }
 
+const TRENDS_COLOR_SALARY = 'var(--primary)';
+const TRENDS_COLOR_EXPENSE = 'var(--rose)';
+let trendsData = [];
+let trendsSelectedYears = new Set();
+let trendsOpen = false;
+
+// Mirrors recalcTotals()'s auto-derivation of Subscriptions/Extra Spending so
+// historical sheets (which lack those `kind` tags and just store final
+// numbers) and the live sheet (which derives them) total consistently.
+function computeYearlySummary(data){
+  const income = Array.isArray(data.income) ? data.income : [];
+  const salaryItem = income.find(i => i.kind === 'salary') || income.find(i => (i.label || '').trim() === 'Gross Annual Salary');
+  const salary = salaryItem ? salaryItem.val : 0;
+
+  const subs = Array.isArray(data.subs) ? data.subs : [];
+  const subT = subs.reduce((s,i)=>s+i.val, 0);
+
+  const p1 = (Array.isArray(data.p1) ? data.p1 : []).map(i => ({...i}));
+  const p2 = (Array.isArray(data.p2) ? data.p2 : []).map(i => ({...i}));
+  const netPaycheckItem = income.find(i => i.kind === 'netPaycheck') || income.find(i => (i.label || '').trim() === 'Net Paycheck (every 2 weeks)');
+  const netPaycheck = netPaycheckItem ? netPaycheckItem.val : 0;
+
+  const p1SubsLinkItem = p1.find(i => i.kind === 'subsLink');
+  const p1ExtraItem = p1.find(i => i.kind === 'extraSpending');
+  const p2ExtraItem = p2.find(i => i.kind === 'extraSpending');
+  if(p1SubsLinkItem) p1SubsLinkItem.val = subT;
+  if(p1ExtraItem){
+    const p1Other = p1.filter(i => i !== p1ExtraItem).reduce((s,i)=>s+i.val, 0) + (p1SubsLinkItem ? 0 : subT);
+    p1ExtraItem.val = netPaycheck - p1Other;
+  }
+  if(p2ExtraItem){
+    const p2Other = p2.filter(i => i !== p2ExtraItem).reduce((s,i)=>s+i.val, 0);
+    p2ExtraItem.val = netPaycheck - p2Other;
+  }
+
+  const p1t = p1.reduce((s,i)=>s+i.val, 0) + (p1SubsLinkItem ? 0 : subT);
+  const p2t = p2.reduce((s,i)=>s+i.val, 0);
+  const payPeriods = data.payPeriods || 26;
+  const totalExpense = (p1t + p2t) * (payPeriods / 2);
+  return {salary, totalExpense};
+}
+
+async function loadTrendsData(){
+  const years = sheetsIndex.filter(s => s.year).slice().sort((a,b)=>a.year - b.year);
+  const points = [];
+  for(const sheet of years){
+    let data;
+    if(sheet.id === currentSheetId){
+      data = state;
+    } else {
+      try{
+        const result = await window.storage.get(sheetStorageKey(sheet.id), true);
+        data = JSON.parse(result.value);
+      }catch(err){ continue; }
+    }
+    points.push({year: sheet.year, ...computeYearlySummary(data)});
+  }
+  return points;
+}
+
+function renderTrendsYearSelect(){
+  const el = document.getElementById('trendsYearSelect');
+  el.innerHTML = trendsData.map(p => `
+    <label class="age-chip" data-year="${p.year}">
+      <input type="checkbox" value="${p.year}">
+      <span class="chip-box"></span>
+      <span>${p.year}</span>
+    </label>`).join('');
+  syncTrendsYearSelectUI();
+}
+
+function syncTrendsYearSelectUI(){
+  document.querySelectorAll('#trendsYearSelect .age-chip').forEach(chip=>{
+    const year = parseInt(chip.dataset.year, 10);
+    const checked = trendsSelectedYears.has(year);
+    chip.classList.toggle('active', checked);
+    chip.querySelector('input').checked = checked;
+  });
+  const btn = document.getElementById('trendsSelectAllBtn');
+  const allSelected = trendsData.length > 0 && trendsData.every(p => trendsSelectedYears.has(p.year));
+  btn.textContent = allSelected ? 'Deselect all' : 'Select all';
+}
+
+function renderTrendsChart(){
+  const wrap = document.getElementById('trendsChartWrap');
+  const pts = trendsData.filter(p => trendsSelectedYears.has(p.year)).sort((a,b)=>a.year - b.year);
+  if(pts.length === 0){
+    wrap.innerHTML = '<p class="placeholder-card">Select at least one year to see the chart.</p>';
+    document.getElementById('trendsChartLegend').innerHTML = '';
+    return;
+  }
+  const W = 760, H = 260, ML = 54, MR = 16, MT = 16, MB = 28;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const minYear = pts[0].year, maxYear = pts[pts.length - 1].year;
+  const span = Math.max(maxYear - minYear, 1);
+  const maxVal = Math.max(...pts.map(p => Math.max(p.salary, p.totalExpense))) * 1.08 || 1;
+  const xPos = year => pts.length === 1 ? ML + plotW / 2 : ML + (year - minYear) / span * plotW;
+  const yPos = val => MT + plotH - (val / maxVal) * plotH;
+
+  let gridSvg = '';
+  const gridCount = 4;
+  for(let i=0;i<=gridCount;i++){
+    const val = maxVal * i / gridCount;
+    const gy = yPos(val);
+    gridSvg += `<line class="ret-gridline" x1="${ML}" x2="${W-MR}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}"/>`;
+    gridSvg += `<text class="ret-axis-label" x="${ML-8}" y="${(gy+3).toFixed(1)}" text-anchor="end">${fmtCompact(val)}</text>`;
+  }
+
+  const linePath = key => pts.map((p,i) => (i===0?'M':'L') + xPos(p.year).toFixed(1) + ',' + yPos(p[key]).toFixed(1)).join(' ');
+
+  let yearLabelsSvg = '';
+  pts.forEach(p=>{
+    yearLabelsSvg += `<text class="ret-axis-label" x="${xPos(p.year).toFixed(1)}" y="${H-6}" text-anchor="middle">${p.year}</text>`;
+  });
+
+  const dotsSvg = pts.map(p => `
+      <circle cx="${xPos(p.year).toFixed(1)}" cy="${yPos(p.salary).toFixed(1)}" r="3" fill="${TRENDS_COLOR_SALARY}" stroke="var(--card)" stroke-width="1.5"/>
+      <circle cx="${xPos(p.year).toFixed(1)}" cy="${yPos(p.totalExpense).toFixed(1)}" r="3" fill="${TRENDS_COLOR_EXPENSE}" stroke="var(--card)" stroke-width="1.5"/>`).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${gridSvg}
+      <path d="${linePath('totalExpense')}" fill="none" stroke="${TRENDS_COLOR_EXPENSE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath('salary')}" fill="none" stroke="${TRENDS_COLOR_SALARY}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dotsSvg}
+      ${yearLabelsSvg}
+    </svg>`;
+
+  const overlay = document.createElement('div');
+  overlay.style.position = 'absolute';
+  overlay.style.inset = '0';
+  overlay.style.cursor = 'crosshair';
+  wrap.appendChild(overlay);
+  const crosshair = document.createElement('div');
+  crosshair.className = 'ret-crosshair';
+  wrap.appendChild(crosshair);
+  const tooltip = document.createElement('div');
+  tooltip.className = 'ret-tooltip';
+  wrap.appendChild(tooltip);
+
+  function handleMove(clientX){
+    const rect = wrap.getBoundingClientRect();
+    const scale = rect.width / W;
+    const dataX = (clientX - rect.left) / scale;
+    const yearFloat = minYear + (dataX - ML) / plotW * span;
+    let nearest = pts[0], nearestDist = Infinity;
+    pts.forEach(p => { const d = Math.abs(p.year - yearFloat); if(d < nearestDist){ nearestDist = d; nearest = p; } });
+    const cxPx = xPos(nearest.year) * scale;
+    crosshair.style.left = cxPx + 'px';
+    crosshair.style.opacity = '1';
+    tooltip.style.left = Math.min(Math.max(cxPx, 70), rect.width - 70) + 'px';
+    tooltip.style.opacity = '1';
+    tooltip.innerHTML = `<div class="tt-title">${nearest.year}</div>
+      <div class="tt-row"><i style="background:${TRENDS_COLOR_SALARY}"></i>Gross salary<span class="tt-val">${fmt(nearest.salary)}</span></div>
+      <div class="tt-row"><i style="background:${TRENDS_COLOR_EXPENSE}"></i>Total expenses<span class="tt-val">${fmt(nearest.totalExpense)}</span></div>`;
+  }
+  overlay.addEventListener('pointermove', e => handleMove(e.clientX));
+  overlay.addEventListener('pointerleave', () => { crosshair.style.opacity = '0'; tooltip.style.opacity = '0'; });
+
+  document.getElementById('trendsChartLegend').innerHTML = `
+    <span><i style="background:${TRENDS_COLOR_SALARY}"></i>Gross annual salary</span>
+    <span><i style="background:${TRENDS_COLOR_EXPENSE}"></i>Total annual expenses</span>`;
+}
+
+async function refreshTrends(){
+  trendsData = await loadTrendsData();
+  const knownYears = new Set(trendsData.map(p => p.year));
+  if(trendsSelectedYears.size === 0){
+    trendsData.forEach(p => trendsSelectedYears.add(p.year));
+  } else {
+    trendsSelectedYears.forEach(y => { if(!knownYears.has(y)) trendsSelectedYears.delete(y); });
+  }
+  renderTrendsYearSelect();
+  renderTrendsChart();
+}
+
+async function toggleTrends(){
+  trendsOpen = !trendsOpen;
+  document.getElementById('trendsCard').style.display = trendsOpen ? '' : 'none';
+  if(trendsOpen) await refreshTrends();
+}
+
 function showPage(page){
   document.getElementById('page-ledger').style.display = page === 'ledger' ? 'block' : 'none';
   document.getElementById('page-retirement').style.display = page === 'retirement' ? 'block' : 'none';
@@ -1797,6 +1997,23 @@ async function init(){
   document.getElementById('topNav').addEventListener('click', e=>{
     const btn = e.target.closest('button[data-page]');
     if(btn) showPage(btn.dataset.page);
+  });
+
+  document.getElementById('trendsBtn').addEventListener('click', toggleTrends);
+  document.getElementById('trendsYearSelect').addEventListener('change', e=>{
+    const cb = e.target.closest('input[type=checkbox]');
+    if(!cb) return;
+    const year = parseInt(cb.closest('.age-chip').dataset.year, 10);
+    if(cb.checked) trendsSelectedYears.add(year); else trendsSelectedYears.delete(year);
+    syncTrendsYearSelectUI();
+    renderTrendsChart();
+  });
+  document.getElementById('trendsSelectAllBtn').addEventListener('click', ()=>{
+    const allSelected = trendsData.length > 0 && trendsData.every(p => trendsSelectedYears.has(p.year));
+    if(allSelected) trendsSelectedYears.clear();
+    else trendsData.forEach(p => trendsSelectedYears.add(p.year));
+    syncTrendsYearSelectUI();
+    renderTrendsChart();
   });
 
   document.getElementById('newSheetCancel').addEventListener('click', ()=>{
